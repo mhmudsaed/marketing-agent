@@ -12,7 +12,6 @@ class Settings:
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
-    OPENROUTER_SITE_NAME: str = os.getenv("OPENROUTER_SITE_NAME", "MarketingAgent")
     OPENROUTER_TIMEOUT: int = 120
     
     # Tavily

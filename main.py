@@ -2,6 +2,7 @@
 import sys
 import asyncio
 import argparse
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -139,7 +140,7 @@ Examples:
     if args.model:
         settings.OPENROUTER_MODEL = args.model
     if args.output_dir:
-        settings.OUTPUT_DIR = args.output_dir
+        settings.OUTPUT_DIR = Path(args.output_dir)
     
     # Validate
     validate_settings()

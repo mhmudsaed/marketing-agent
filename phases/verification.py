@@ -7,7 +7,8 @@ from models.strategy import StrategyResult
 from models.content import GeneratedContent, ContentPackage
 from models.verification import VerificationResult, CheckResult, PipelineVerificationReport
 from utils.prompts import (
-    VERIFICATION_SYSTEM_PROMPT, BRAND_ALIGNMENT_PROMPT, FACT_CHECK_PROMPT,
+    VERIFICATION_SYSTEM_PROMPT, CONTENT_SYSTEM_PROMPT,
+    BRAND_ALIGNMENT_PROMPT, FACT_CHECK_PROMPT,
     FORMAT_CHECK_PROMPT, QUALITY_CHECK_PROMPT, REFINE_PROMPT, CHANNEL_REQUIREMENTS
 )
 from utils.validators import ContentValidator
@@ -166,6 +167,12 @@ class VerificationEngine:
         # Should not reach here, but safety fallback
         return self._error_verification(content, idx, "Max iterations exceeded")
     
+    def _parse_check_result(self, result: dict, default_name: str) -> CheckResult:
+        """Parse LLM result into CheckResult, injecting name if missing."""
+        if "check_name" not in result:
+            result["check_name"] = default_name
+        return CheckResult(**result)
+
     async def _check_brand_alignment(self, content: str, research: ResearchResult) -> CheckResult:
         """Check if content matches brand voice."""
         try:
@@ -185,7 +192,7 @@ class VerificationEngine:
                 max_tokens=1000
             )
             
-            return CheckResult(**result)
+            return self._parse_check_result(result, "Brand Alignment")
         except Exception as e:
             logger.warning(f"Brand alignment LLM check failed: {e}")
             # Fallback to heuristic
@@ -227,7 +234,7 @@ Niche: {research.business.niche}
                 max_tokens=1000
             )
             
-            return CheckResult(**result)
+            return self._parse_check_result(result, "Fact Check")
         except Exception as e:
             logger.warning(f"Fact check LLM failed: {e}")
             return CheckResult(
@@ -287,7 +294,7 @@ Niche: {research.business.niche}
                 max_tokens=1000
             )
             
-            return CheckResult(**result)
+            return self._parse_check_result(result, "Quality Check")
         except Exception as e:
             logger.warning(f"Quality check LLM failed: {e}")
             # Fallback heuristic

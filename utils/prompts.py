@@ -27,7 +27,54 @@ Your task:
 6. Provide evidence (URLs, quotes) for all claims
 7. Give a confidence score (0.0-1.0) and summary
 
-Output valid JSON only. No markdown, no explanation."""
+CRITICAL: Output MUST be a single valid JSON object with this exact structure:
+{{
+  "business": {{
+    "name": "Company Name",
+    "tagline": "One-liner description",
+    "description": "Detailed paragraph about what they do",
+    "industry": "Industry name",
+    "niche": "Specific niche",
+    "products": ["Product 1", "Product 2"],
+    "value_proposition": "What makes them unique",
+    "target_market": "Who they serve",
+    "founded": "Year if known",
+    "size": "Company size if known"
+  }},
+  "audience": [
+    {{
+      "persona": "Persona name",
+      "demographics": "Age, location, industry",
+      "pain_points": ["Pain 1", "Pain 2"],
+      "goals": ["Goal 1"],
+      "channels": ["LinkedIn", "Instagram"]
+    }}
+  ],
+  "brand_voice": {{
+    "tone": "e.g. Professional, Playful, Empowering",
+    "style": "e.g. Concise, Storytelling, Direct",
+    "keywords": ["word1", "word2"],
+    "avoid": ["word1", "word2"],
+    "examples": ["Example sentence 1", "Example sentence 2"]
+  }},
+  "competitors": [
+    {{
+      "name": "Competitor Name",
+      "url": "https://competitor.com",
+      "differentiator": "How target biz differs"
+    }}
+  ],
+  "content_examples": ["Example post 1", "Example post 2"],
+  "evidence": {{
+    "source_urls": ["https://source1.com"],
+    "quotes": ["Quote from source"],
+    "search_queries_used": ["query 1"]
+  }},
+  "confidence_score": 0.85,
+  "summary": "Executive summary paragraph"
+}}
+
+DO NOT output markdown code blocks. DO NOT output explanatory text. Output raw JSON ONLY."""
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 2: STRATEGY & PLANNING
@@ -64,7 +111,44 @@ Consider:
 - Realistic posting cadence for a small business
 - Mix of educational, promotional, and engagement content
 
-Output valid JSON only. No markdown, no explanation."""
+CRITICAL: Output MUST be a single valid JSON object with this exact structure:
+{{
+  "pillars": [
+    {{
+      "name": "Pillar Name",
+      "description": "What this pillar covers",
+      "percentage": 40,
+      "topics": ["Topic 1", "Topic 2"]
+    }}
+  ],
+  "channels": [
+    {{
+      "channel": "LinkedIn",
+      "purpose": "Why this channel",
+      "audience_fit": "How audience uses it",
+      "content_types": ["Posts", "Carousels"],
+      "optimal_times": ["09:00", "14:00"],
+      "frequency": "3x per week"
+    }}
+  ],
+  "calendar": [
+    {{
+      "date": "2026-04-26",
+      "time": "09:00",
+      "channel": "LinkedIn",
+      "pillar": "Pillar Name",
+      "topic": "Specific topic",
+      "format": "single",
+      "cta": "Call to action text",
+      "objective": "awareness",
+      "target_persona": "Persona name"
+    }}
+  ],
+  "overall_strategy": "Summary of strategy",
+  "rationale": "Why this strategy was chosen"
+}}
+
+DO NOT output markdown code blocks. DO NOT output explanatory text. Output raw JSON ONLY."""
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 3: CONTENT GENERATION

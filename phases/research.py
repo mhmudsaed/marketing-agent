@@ -1,5 +1,6 @@
 """Phase 1: Research & Discovery engine."""
 import json
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from clients.openrouter import OpenRouterClient
@@ -203,9 +204,12 @@ class ResearchEngine:
             size=business_data.get("size")
         )
         
-        audience = [
-            BuyerPersona(**p) for p in data.get("audience", [])
-        ]
+        audience = []
+        for p in data.get("audience", []):
+            if isinstance(p, dict):
+                audience.append(BuyerPersona(**p))
+            else:
+                logger.warning(f"Skipping malformed persona: {p}")
         
         brand_data = data.get("brand_voice", {})
         brand_voice = BrandVoice(
@@ -216,9 +220,14 @@ class ResearchEngine:
             examples=brand_data.get("examples", [])
         )
         
-        competitors = [
-            Competitor(**c) for c in data.get("competitors", [])
-        ]
+        competitors = []
+        for c in data.get("competitors", []):
+            if isinstance(c, dict):
+                competitors.append(Competitor(**c))
+            elif isinstance(c, str):
+                competitors.append(Competitor(name=c, differentiator="Unknown"))
+            else:
+                logger.warning(f"Skipping malformed competitor: {c}")
         
         evidence_data = data.get("evidence", {})
         evidence = ResearchEvidence(
@@ -226,6 +235,13 @@ class ResearchEngine:
             quotes=evidence_data.get("quotes", []),
             search_queries_used=evidence_data.get("search_queries_used", [])
         )
+        
+        # Apply fallback extraction if structured fields are empty
+        summary_text = data.get("summary", "")
+        if business.name == "Unknown" or not business.description:
+            business, brand_voice, audience, competitors = self._fallback_extract_from_summary(
+                business, brand_voice, audience, competitors, summary_text, url
+            )
         
         return ResearchResult(
             business=business,
@@ -240,5 +256,77 @@ class ResearchEngine:
                 "timestamp": datetime.utcnow().isoformat()
             },
             confidence_score=data.get("confidence_score", 0.5),
-            summary=data.get("summary", "")
+            summary=summary_text
         )
+    
+    def _fallback_extract_from_summary(
+        self,
+        business: BusinessProfile,
+        brand_voice: BrandVoice,
+        audience: List[BuyerPersona],
+        competitors: List[Competitor],
+        summary: str,
+        url: str
+    ) -> tuple:
+        """Extract structured data from summary when JSON fields are empty."""
+        if not summary:
+            return business, brand_voice, audience, competitors
+        
+        # Extract business name from URL if unknown
+        if business.name == "Unknown" or not business.name:
+            domain = url.replace("https://", "").replace("http://", "").split("/")[0]
+            business.name = domain.replace("www.", "").split(".")[0].capitalize()
+        
+        # Use summary as description if empty
+        if not business.description:
+            business.description = summary[:500]
+        
+        # Extract industry from summary
+        if business.industry == "Unknown":
+            industries = ["coworking", "software", "AI", "technology", "marketing", 
+                         "consulting", "e-commerce", "healthcare", "fintech", "education"]
+            summary_lower = summary.lower()
+            for ind in industries:
+                if ind in summary_lower:
+                    business.industry = ind.capitalize()
+                    break
+            if business.industry == "Unknown":
+                business.industry = "Business Services"
+        
+        # Extract niche
+        if business.niche == "Unknown":
+            business.niche = business.industry
+        
+        # Extract value proposition from summary
+        if not business.value_proposition:
+            # Take first sentence or first 150 chars
+            first_sent = summary.split(".")[0] if "." in summary else summary[:150]
+            business.value_proposition = first_sent.strip()
+        
+        # Derive brand voice from summary
+        if brand_voice.tone == "Professional" and not brand_voice.keywords:
+            # Simple heuristic extraction
+            summary_lower = summary.lower()
+            empowering = any(w in summary_lower for w in ["empower", "community", "belong", "connect", "growth"])
+            playful = any(w in summary_lower for w in ["fun", "playful", "creative", "innovative"])
+            formal = any(w in summary_lower for w in ["enterprise", "solution", "corporate", "professional"])
+            
+            if empowering:
+                brand_voice.tone = "Empowering and Community-Centric"
+                brand_voice.keywords = ["community", "growth", "connection", "focus"]
+            elif playful:
+                brand_voice.tone = "Playful and Creative"
+            elif formal:
+                brand_voice.tone = "Professional and Formal"
+        
+        # Create a generic persona if none found
+        if not audience:
+            audience.append(BuyerPersona(
+                persona="Target Customer",
+                demographics="Professionals and businesses",
+                pain_points=["Need for workspace", "Community", "Productivity"],
+                goals=["Grow business", "Network", "Focus"],
+                channels=["LinkedIn", "Instagram", "Website"]
+            ))
+        
+        return business, brand_voice, audience, competitors

@@ -27,7 +27,6 @@ class OpenRouterClient:
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "X-Title": settings.OPENROUTER_SITE_NAME or "MarketingAgent",
         }
         self.client = httpx.AsyncClient(
             headers=self.headers,
