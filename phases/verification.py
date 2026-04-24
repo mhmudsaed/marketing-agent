@@ -115,22 +115,27 @@ class VerificationEngine:
                 quality_check.score * 0.20
             )
             
-            # Determine status
-            statuses = [brand_check.status, fact_check.status, format_check.status, quality_check.status]
-            if all(s == "PASS" for s in statuses):
+            # Determine status based on SCORE (not just individual checks)
+            # Score-based: >= 0.75 = PASS, 0.5-0.75 = NEEDS_REVIEW, < 0.5 = FAIL
+            if overall_score >= 0.75:
                 overall_status = "PASS"
-            elif "FAIL" in statuses and iteration == max_iterations:
-                overall_status = "FAIL"
-            elif "FAIL" in statuses:
-                overall_status = "NEEDS_REFINEMENT"
-            else:
+            elif overall_score >= 0.5:
                 overall_status = "NEEDS_REVIEW"
+            else:
+                overall_status = "FAIL"
             
-            # If pass or last iteration, return
-            if overall_status == "PASS" or iteration == max_iterations:
+            # If pass, or at max iterations with acceptable score, return
+            should_return = (
+                overall_status == "PASS" 
+                or iteration == max_iterations
+            )
+            
+            if should_return:
+                # Accept if score is decent (>= 0.6), even if not perfect
+                is_accepted = overall_score >= 0.6
                 return VerificationResult(
                     content_id=idx,
-                    overall_status="PASS" if overall_status == "PASS" else "FAIL",
+                    overall_status="PASS" if is_accepted else "FAIL",
                     overall_score=round(overall_score, 2),
                     brand_alignment=brand_check,
                     fact_check=fact_check,
@@ -139,10 +144,10 @@ class VerificationEngine:
                     iteration=iteration,
                     max_iterations=max_iterations,
                     was_modified=iteration > 1,
-                    modifications_made=[],  # Could track these
-                    final_content=current_text if overall_status == "PASS" else None,
-                    rejected=overall_status != "PASS" and iteration == max_iterations,
-                    rejection_reason=None if overall_status == "PASS" else "Failed verification after max iterations"
+                    modifications_made=[],
+                    final_content=current_text if is_accepted else None,
+                    rejected=not is_accepted,
+                    rejection_reason=None if is_accepted else f"Score {overall_score:.2f} below acceptance threshold (0.6)"
                 )
             
             # Need refinement - collect all feedback
