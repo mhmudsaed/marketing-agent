@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Calendar - Marketing Content Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { background: #020617; color: #e2e8f0; }
+        .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .calendar-day { min-height: 100px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; }
+        .calendar-day:hover { border-color: #6366f1; }
+        .post-chip { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; }
+        .post-linkedin { background: #0077b5/20; color: #60a5fa; }
+        .post-instagram { background: #e4405f/20; color: #f472b6; }
+        .post-facebook { background: #1877f2/20; color: #93c5fd; }
+        .post-x { background: #000/20; color: #9ca3af; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex h-screen">
+        <aside class="w-64 bg-surface border-r border-surface-light hidden md:flex flex-col" style="background: #1e293b;">
+            <div class="p-6 border-b border-surface-light">
+                <h1 class="text-xl font-bold gradient-text">
+                    <i class="fas fa-rocket mr-2"></i>Content Agent
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="/" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-home w-6"></i> Dashboard
+                </a>
+                <a href="/campaign/new" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-plus w-6"></i> New Campaign
+                </a>
+                <a href="/calendar" class="flex items-center px-4 py-3 rounded-lg bg-primary/20 text-primary font-medium">
+                    <i class="fas fa-calendar w-6"></i> Calendar
+                </a>
+                <a href="/settings" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-cog w-6"></i> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-auto">
+            <header class="p-6 border-b border-surface-light" style="background: #1e293b;">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">Content Calendar</h2>
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeMonth(-1)" class="p-2 hover:bg-surface-light rounded-lg"><i class="fas fa-chevron-left"></i></button>
+                        <span id="month-label" class="font-medium w-32 text-center"></span>
+                        <button onclick="changeMonth(1)" class="p-2 hover:bg-surface-light rounded-lg"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-6">
+                <div class="card p-6">
+                    <div class="grid grid-cols-7 gap-2 mb-2">
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Sun</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Mon</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Tue</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Wed</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Thu</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Fri</div>
+                        <div class="text-center text-sm font-medium text-gray-400 py-2">Sat</div>
+                    </div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2">
+                        <!-- JS renders this -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        const posts = {{ posts | tojson }};
+        const campaigns = {{ campaigns | tojson }};
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = new Date(year, month, 1).getDay();
+            
+            document.getElementById('month-label').textContent = 
+                new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            let html = '';
+            
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div></div>';
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayPosts = posts.filter(p => p.date === dateStr);
+                const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                
+                html += `<div class="calendar-day p-2 ${isToday ? 'border-primary' : ''}">`;
+                html += `<div class="text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}">${day}</div>`;
+                
+                dayPosts.forEach(post => {
+                    const channelClass = 'post-' + (post.channel || 'unknown').toLowerCase();
+                    const campaign = campaigns.find(c => c.id === post.campaign_id);
+                    html += `<div class="post-chip ${channelClass} mb-1 truncate" title="${post.title || 'Post'}">`;
+                    html += `${post.channel || '?'}: ${(post.title || 'Post').substring(0, 15)}...</div>`;
+                });
+                
+                html += '</div>';
+            }
+            
+            document.getElementById('calendar-grid').innerHTML = html;
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        renderCalendar();
+    </script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Marketing Content Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { background: #020617; color: #e2e8f0; }
+        .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .input-field { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; }
+        .input-field:focus { border-color: #6366f1; outline: none; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex h-screen">
+        <aside class="w-64 bg-surface border-r border-surface-light hidden md:flex flex-col" style="background: #1e293b;">
+            <div class="p-6 border-b border-surface-light">
+                <h1 class="text-xl font-bold gradient-text">
+                    <i class="fas fa-rocket mr-2"></i>Content Agent
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="/" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-home w-6"></i> Dashboard
+                </a>
+                <a href="/campaign/new" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-plus w-6"></i> New Campaign
+                </a>
+                <a href="/settings" class="flex items-center px-4 py-3 rounded-lg bg-primary/20 text-primary font-medium">
+                    <i class="fas fa-cog w-6"></i> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-auto">
+            <header class="p-6 border-b border-surface-light" style="background: #1e293b;">
+                <h2 class="text-xl font-semibold">Settings</h2>
+            </header>
+
+            <div class="p-6 max-w-4xl mx-auto space-y-6">
+                <!-- API Status -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">API Configuration</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 bg-darker rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                                    <i class="fas fa-brain text-primary"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium">OpenRouter (LLM)</p>
+                                    <p class="text-sm text-gray-400">For content generation</p>
+                                </div>
+                            </div>
+                            <span class="status-badge {{ 'bg-green-500/20 text-green-400' if api_configured else 'bg-red-500/20 text-red-400' }} px-3 py-1 rounded-full text-sm">
+                                {{ 'Connected' if api_configured else 'Not Configured' }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between p-4 bg-darker rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <i class="fas fa-search text-blue-400"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium">Tavily (Search)</p>
+                                    <p class="text-sm text-gray-400">For web research</p>
+                                </div>
+                            </div>
+                            <span class="status-badge {{ 'bg-green-500/20 text-green-400' if api_configured else 'bg-red-500/20 text-red-400' }} px-3 py-1 rounded-full text-sm">
+                                {{ 'Connected' if api_configured else 'Not Configured' }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-4 bg-darker rounded-lg">
+                        <p class="text-sm text-gray-400">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            API keys are configured via the <code>.env</code> file. Restart the server after making changes.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Brand Voice Templates -->
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">Brand Voice Templates</h3>
+                        <button class="bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-plus mr-2"></i>New Template
+                        </button>
+                    </div>
+                    {% if brand_voices %}
+                    <div class="space-y-3">
+                        {% for template in brand_voices %}
+                        <div class="p-4 bg-darker rounded-lg flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">{{ template.name }}</p>
+                                <p class="text-sm text-gray-400">{{ template.tone }} &bull; {{ template.style }}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="text-gray-400 hover:text-white p-2"><i class="fas fa-edit"></i></button>
+                                <button class="text-gray-400 hover:text-red-400 p-2"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-center py-4">No brand voice templates yet. Create one to quickly apply brand voice to campaigns.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

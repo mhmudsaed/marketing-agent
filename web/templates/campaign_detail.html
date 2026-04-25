@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ campaign.name }} - Marketing Content Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { background: #020617; color: #e2e8f0; }
+        .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .tab-btn { padding: 0.75rem 1.5rem; border-bottom: 2px solid transparent; font-weight: 500; }
+        .tab-btn.active { border-color: #6366f1; color: #6366f1; }
+        .tab-btn:hover:not(.active) { border-color: #334155; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .post-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; }
+        .post-card:hover { border-color: #6366f1; }
+        .status-badge { font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600; }
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-published { background: #dbeafe; color: #1e40af; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-surface border-r border-surface-light hidden md:flex flex-col" style="background: #1e293b;">
+            <div class="p-6 border-b border-surface-light">
+                <h1 class="text-xl font-bold gradient-text">
+                    <i class="fas fa-rocket mr-2"></i>Content Agent
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="/" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-home w-6"></i> Dashboard
+                </a>
+                <a href="/campaign/new" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-plus w-6"></i> New Campaign
+                </a>
+                <a href="/calendar" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-calendar w-6"></i> Calendar
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-auto">
+            <!-- Header -->
+            <header class="p-6 border-b border-surface-light" style="background: #1e293b;">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <a href="/" class="text-gray-400 hover:text-white transition">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                        <div>
+                            <h2 class="text-xl font-semibold">{{ campaign.name }}</h2>
+                            <p class="text-sm text-gray-400">{{ campaign.business_url }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="status-badge status-{{ campaign.status }}">{{ campaign.status }}</span>
+                        <button onclick="deleteCampaign()" class="text-red-400 hover:text-red-300 px-3 py-2 rounded-lg transition">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Tabs -->
+            <div class="px-6 border-b border-surface-light" style="background: #1e293b;">
+                <div class="flex gap-6">
+                    <button class="tab-btn active" onclick="showTab('research')">Research</button>
+                    <button class="tab-btn" onclick="showTab('strategy')">Strategy</button>
+                    <button class="tab-btn" onclick="showTab('content')">Content ({{ posts|length }})</button>
+                    <button class="tab-btn" onclick="showTab('calendar')">Calendar</button>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <!-- Research Tab -->
+                <div id="tab-research" class="tab-content active">
+                    {% if research %}
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="card p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i class="fas fa-building text-primary"></i> Business Profile
+                            </h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Name</label>
+                                    <p class="font-medium">{{ research.business_name or 'Unknown' }}</p>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Tagline</label>
+                                    <p class="text-gray-300">{{ research.tagline or 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Description</label>
+                                    <p class="text-gray-300 text-sm">{{ research.description or 'N/A' }}</p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="text-xs text-gray-500 uppercase">Industry</label>
+                                        <p class="font-medium">{{ research.industry or 'N/A' }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500 uppercase">Niche</label>
+                                        <p class="font-medium">{{ research.niche or 'N/A' }}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Value Proposition</label>
+                                    <p class="text-gray-300 text-sm">{{ research.value_proposition or 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Target Market</label>
+                                    <p class="text-gray-300 text-sm">{{ research.target_market or 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500 uppercase">Products</label>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        {% for product in research.products or [] %}
+                                        <span class="bg-primary/20 text-primary px-2 py-1 rounded text-xs">{{ product }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="card p-6">
+                                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-palette text-secondary"></i> Brand Voice
+                                </h3>
+                                <div class="space-y-3">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="text-xs text-gray-500 uppercase">Tone</label>
+                                            <p class="font-medium">{{ research.brand_tone or 'N/A' }}</p>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500 uppercase">Style</label>
+                                            <p class="font-medium">{{ research.brand_style or 'N/A' }}</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500 uppercase">Keywords</label>
+                                        <div class="flex flex-wrap gap-2 mt-1">
+                                            {% for kw in research.brand_keywords or [] %}
+                                            <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">{{ kw }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500 uppercase">Avoid</label>
+                                        <div class="flex flex-wrap gap-2 mt-1">
+                                            {% for a in research.brand_avoid or [] %}
+                                            <span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs">{{ a }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card p-6">
+                                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-users text-blue-400"></i> Audience
+                                </h3>
+                                {% if research.audience %}
+                                    {% for persona in research.audience %}
+                                    <div class="mb-4 p-3 bg-darker rounded-lg">
+                                        <p class="font-medium">{{ persona.persona or 'Unknown' }}</p>
+                                        <p class="text-sm text-gray-400">{{ persona.demographics or '' }}</p>
+                                        {% if persona.pain_points %}
+                                        <div class="mt-2">
+                                            <span class="text-xs text-gray-500">Pain Points:</span>
+                                            <div class="flex flex-wrap gap-1 mt-1">
+                                                {% for pp in persona.pain_points %}
+                                                <span class="bg-red-500/10 text-red-400 px-2 py-0.5 rounded text-xs">{{ pp }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-gray-500">No audience data available</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-12">
+                        <p class="text-gray-500">Research data not available yet</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Strategy Tab -->
+                <div id="tab-strategy" class="tab-content">
+                    {% if strategy %}
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="card p-6">
+                            <h3 class="text-lg font-semibold mb-4">Content Pillars</h3>
+                            {% if strategy.pillars %}
+                            <div class="space-y-3">
+                                {% for pillar in strategy.pillars %}
+                                <div class="p-4 bg-darker rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h4 class="font-semibold">{{ pillar.name or 'Unnamed' }}</h4>
+                                        <span class="text-xs bg-primary/20 text-primary px-2 py-1 rounded">{{ pillar.percentage or 0 }}%</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 mb-2">{{ pillar.description or '' }}</p>
+                                    {% if pillar.topics %}
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for topic in pillar.topics %}
+                                        <span class="bg-surface-light px-2 py-0.5 rounded text-xs">{{ topic }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-gray-500">No pillars defined</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="card p-6">
+                            <h3 class="text-lg font-semibold mb-4">Channel Strategy</h3>
+                            {% if strategy.channels %}
+                            <div class="space-y-3">
+                                {% for channel in strategy.channels %}
+                                <div class="p-4 bg-darker rounded-lg">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <i class="fab fa-{{ channel.channel.lower() if channel.channel else 'globe' }} text-primary"></i>
+                                        <h4 class="font-semibold">{{ channel.channel or 'Unknown' }}</h4>
+                                    </div>
+                                    <p class="text-sm text-gray-400 mb-1">{{ channel.purpose or '' }}</p>
+                                    <p class="text-xs text-gray-500">Frequency: {{ channel.frequency or 'N/A' }}</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-gray-500">No channels defined</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card p-6 mt-6">
+                        <h3 class="text-lg font-semibold mb-2">Strategy Summary</h3>
+                        <p class="text-gray-300">{{ strategy.overall_strategy or 'No strategy summary available' }}</p>
+                        <div class="mt-4 p-3 bg-darker rounded-lg">
+                            <span class="text-xs text-gray-500 uppercase">Rationale</span>
+                            <p class="text-sm text-gray-400 mt-1">{{ strategy.rationale or 'N/A' }}</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-12">
+                        <p class="text-gray-500">Strategy data not available yet</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Content Tab -->
+                <div id="tab-content" class="tab-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Posts List -->
+                        <div class="lg:col-span-2 space-y-4">
+                            {% for post in posts %}
+                            <div class="post-card p-4 cursor-pointer" onclick="editPost({{ post.id }})">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fab fa-{{ post.channel.lower() if post.channel else 'globe' }} text-primary"></i>
+                                        <div>
+                                            <h4 class="font-semibold">{{ post.title or 'Untitled' }}</h4>
+                                            <p class="text-xs text-gray-500">{{ post.channel or 'Unknown' }} &bull; {{ post.date or 'No date' }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="status-badge status-{{ post.status }}">{{ post.status }}</span>
+                                </div>
+                                <p class="text-gray-300 text-sm line-clamp-2">{{ post.headline or post.body or 'No content' }}</p>
+                                <div class="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                                    <span><i class="fas fa-chart-line mr-1"></i>{{ "%.0f"|format(post.verification_score * 100) }}% score</span>
+                                    <span><i class="fas fa-font mr-1"></i>{{ post.word_count }} words</span>
+                                    <span><i class="fas fa-clock mr-1"></i>{{ post.reading_time or 'N/A' }}</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-12">
+                                <p class="text-gray-500">No posts generated yet</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Quick Stats -->
+                        <div class="space-y-4">
+                            <div class="card p-4">
+                                <h4 class="font-semibold mb-3">Quick Actions</h4>
+                                <div class="space-y-2">
+                                    <button onclick="approveAll()" class="w-full bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg transition text-sm">
+                                        <i class="fas fa-check mr-2"></i>Approve All
+                                    </button>
+                                    <button onclick="scheduleAll()" class="w-full bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-lg transition text-sm">
+                                        <i class="fas fa-calendar mr-2"></i>Schedule All
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card p-4">
+                                <h4 class="font-semibold mb-3">Status Breakdown</h4>
+                                <div class="space-y-2">
+                                    {% set statuses = {} %}
+                                    {% for post in posts %}
+                                        {% set _ = statuses.update({post.status: statuses.get(post.status, 0) + 1}) %}
+                                    {% endfor %}
+                                    {% for status, count in statuses.items() %}
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm capitalize">{{ status }}</span>
+                                        <span class="text-sm font-medium">{{ count }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calendar Tab -->
+                <div id="tab-calendar" class="tab-content">
+                    <div class="card p-6">
+                        <div id="calendar-view" class="grid grid-cols-7 gap-2">
+                            <!-- Calendar will be rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Post Edit Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
+        <div class="bg-surface border border-surface-light rounded-xl w-full max-w-3xl max-h-[90vh] overflow-auto m-4">
+            <div class="p-6 border-b border-surface-light flex justify-between items-center">
+                <h3 class="text-lg font-semibold">Edit Post</h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Headline / Hook</label>
+                    <textarea id="edit-headline" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white" rows="2"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Body</label>
+                    <textarea id="edit-body" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white" rows="6"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">CTA</label>
+                        <input type="text" id="edit-cta" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Hashtags</label>
+                        <input type="text" id="edit-hashtags" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Date</label>
+                        <input type="date" id="edit-date" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Time</label>
+                        <input type="time" id="edit-time" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Status</label>
+                        <select id="edit-status" class="w-full bg-darker border border-surface-light rounded-lg p-3 text-white">
+                            <option value="draft">Draft</option>
+                            <option value="approved">Approved</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="published">Published</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-surface-light flex justify-between">
+                <button onclick="deletePost()" class="text-red-400 hover:text-red-300 px-4 py-2">
+                    <i class="fas fa-trash mr-2"></i>Delete
+                </button>
+                <div class="flex gap-3">
+                    <button onclick="closeEditModal()" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                    <button onclick="savePost()" class="bg-primary hover:bg-primary/80 text-white px-6 py-2 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPostId = null;
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function editPost(postId) {
+            currentPostId = postId;
+            const response = await fetch('/api/campaigns/{{ campaign.id }}/posts');
+            const posts = await response.json();
+            const post = posts.find(p => p.id === postId);
+            
+            if (post) {
+                document.getElementById('edit-headline').value = post.headline || '';
+                document.getElementById('edit-body').value = post.body || '';
+                document.getElementById('edit-cta').value = post.cta || '';
+                document.getElementById('edit-hashtags').value = (post.hashtags || []).join(' ');
+                document.getElementById('edit-date').value = post.date || '';
+                document.getElementById('edit-time').value = post.time || '';
+                document.getElementById('edit-status').value = post.status || 'draft';
+                
+                document.getElementById('edit-modal').classList.remove('hidden');
+                document.getElementById('edit-modal').classList.add('flex');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            document.getElementById('edit-modal').classList.remove('flex');
+            currentPostId = null;
+        }
+
+        async function savePost() {
+            if (!currentPostId) return;
+            
+            const data = {
+                headline: document.getElementById('edit-headline').value,
+                body: document.getElementById('edit-body').value,
+                cta: document.getElementById('edit-cta').value,
+                hashtags: document.getElementById('edit-hashtags').value.split(/\s+/).filter(h => h),
+                date: document.getElementById('edit-date').value,
+                time: document.getElementById('edit-time').value,
+                status: document.getElementById('edit-status').value
+            };
+            
+            await fetch('/api/posts/' + currentPostId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            closeEditModal();
+            window.location.reload();
+        }
+
+        async function deletePost() {
+            if (!currentPostId || !confirm('Delete this post?')) return;
+            await fetch('/api/posts/' + currentPostId, { method: 'DELETE' });
+            closeEditModal();
+            window.location.reload();
+        }
+
+        async function deleteCampaign() {
+            if (!confirm('Delete this entire campaign? This cannot be undone.')) return;
+            await fetch('/api/campaigns/{{ campaign.id }}', { method: 'DELETE' });
+            window.location = '/';
+        }
+
+        async function approveAll() {
+            const posts = await fetch('/api/campaigns/{{ campaign.id }}/posts').then(r => r.json());
+            for (const post of posts.filter(p => p.status === 'draft')) {
+                await fetch('/api/posts/' + post.id + '/approve', { method: 'POST' });
+            }
+            window.location.reload();
+        }
+
+        // Render calendar
+        function renderCalendar() {
+            const posts = {{ posts | tojson }};
+            const calendar = document.getElementById('calendar-view');
+            
+            // Get current month
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = new Date(year, month, 1).getDay();
+            
+            let html = '';
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            days.forEach(day => {
+                html += `<div class="text-center text-xs text-gray-500 py-2">${day}</div>`;
+            });
+            
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div></div>';
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayPosts = posts.filter(p => p.date === dateStr);
+                
+                html += `<div class="min-h-[80px] p-2 bg-darker rounded-lg border border-surface-light">`;
+                html += `<div class="text-sm font-medium mb-1">${day}</div>`;
+                dayPosts.forEach(post => {
+                    const channelIcon = post.channel === 'LinkedIn' ? 'linkedin' : 
+                                       post.channel === 'Instagram' ? 'instagram' :
+                                       post.channel === 'Facebook' ? 'facebook' : 'globe';
+                    html += `<div class="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded mb-1 truncate">`;
+                    html += `<i class="fab fa-${channelIcon}"></i> ${post.title || 'Post'}</div>`;
+                });
+                html += `</div>`;
+            }
+            
+            calendar.innerHTML = html;
+        }
+
+        renderCalendar();
+    </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Content Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        dark: '#0f172a',
+                        darker: '#020617',
+                        surface: '#1e293b',
+                        'surface-light': '#334155'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #020617; color: #e2e8f0; }
+        .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .card:hover { border-color: #6366f1; transition: all 0.3s; }
+        .status-badge { font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 600; }
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-ready { background: #d1fae5; color: #065f46; }
+        .status-published { background: #dbeafe; color: #1e40af; }
+        .status-researching { background: #fce7f3; color: #9d174d; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .progress-bar { height: 4px; background: #334155; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); transition: width 0.5s; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Sidebar -->
+    <div class="flex h-screen">
+        <aside class="w-64 bg-surface border-r border-surface-light hidden md:flex flex-col">
+            <div class="p-6 border-b border-surface-light">
+                <h1 class="text-xl font-bold gradient-text">
+                    <i class="fas fa-rocket mr-2"></i>Content Agent
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="/" class="flex items-center px-4 py-3 rounded-lg bg-primary/20 text-primary font-medium">
+                    <i class="fas fa-home w-6"></i> Dashboard
+                </a>
+                <a href="/campaign/new" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-plus w-6"></i> New Campaign
+                </a>
+                <a href="/calendar" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-calendar w-6"></i> Calendar
+                </a>
+                <a href="/settings" class="flex items-center px-4 py-3 rounded-lg hover:bg-surface-light text-gray-300">
+                    <i class="fas fa-cog w-6"></i> Settings
+                </a>
+            </nav>
+            <div class="p-4 border-t border-surface-light">
+                <div class="text-xs text-gray-500">
+                    v2.0.0 &bull; AI Marketing Agent
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-auto">
+            <!-- Top Bar -->
+            <header class="bg-surface border-b border-surface-light p-4 flex justify-between items-center">
+                <h2 class="text-lg font-semibold">Dashboard</h2>
+                <a href="/campaign/new" class="bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg font-medium transition">
+                    <i class="fas fa-plus mr-2"></i>New Campaign
+                </a>
+            </header>
+
+            <div class="p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total Campaigns</p>
+                                <p class="text-3xl font-bold mt-1">{{ stats.total }}</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                                <i class="fas fa-bullhorn text-primary text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Ready to Publish</p>
+                                <p class="text-3xl font-bold mt-1 text-green-400">{{ stats.ready }}</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Published</p>
+                                <p class="text-3xl font-bold mt-1 text-blue-400">{{ stats.published }}</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                <i class="fas fa-paper-plane text-blue-400 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">In Progress</p>
+                                <p class="text-3xl font-bold mt-1 text-yellow-400">{{ stats.in_progress }}</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                <i class="fas fa-spinner text-yellow-400 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campaigns List -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">Your Campaigns</h3>
+                    
+                    {% if campaigns %}
+                    <div class="space-y-3">
+                        {% for campaign in campaigns %}
+                        <div class="flex items-center justify-between p-4 bg-darker rounded-lg hover:bg-surface-light transition cursor-pointer"
+                             onclick="window.location='/campaign/{{ campaign.id }}'">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
+                                    <i class="fas fa-building text-primary"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold">{{ campaign.name }}</h4>
+                                    <p class="text-sm text-gray-400">{{ campaign.business_url }}</p>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <span class="status-badge status-{{ campaign.status }}">{{ campaign.status }}</span>
+                                        <span class="text-xs text-gray-500">{{ campaign.post_count }} posts</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                {% if campaign.progress > 0 and campaign.progress < 100 %}
+                                <div class="w-32 mb-2">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {{ campaign.progress }}%"></div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <p class="text-xs text-gray-500">
+                                    {{ campaign.created_at.strftime('%b %d, %Y') if campaign.created_at else 'Just now' }}
+                                </p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-12">
+                        <div class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-rocket text-primary text-3xl"></i>
+                        </div>
+                        <h4 class="text-lg font-semibold mb-2">No campaigns yet</h4>
+                        <p class="text-gray-400 mb-4">Create your first marketing campaign in minutes</p>
+                        <a href="/campaign/new" class="bg-primary hover:bg-primary/80 text-white px-6 py-2 rounded-lg font-medium transition">
+                            Create Campaign
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
