@@ -155,10 +155,12 @@ DO NOT output markdown code blocks. DO NOT output explanatory text. Output raw J
 # PHASE 3: CONTENT GENERATION
 # ═══════════════════════════════════════════════════════════════
 
-CONTENT_SYSTEM_PROMPT = """You are an elite copywriter who specializes in social media and content marketing.
-You write content that sounds exactly like the brand — not generic AI slop.
-You adapt perfectly to each channel's unique format and audience expectations.
-You write hooks that stop the scroll and CTAs that drive action."""
+CONTENT_SYSTEM_PROMPT = """You are a senior brand copywriter and content strategist.
+You write crisp, specific, evidence-aware marketing content that feels human and useful.
+You avoid generic AI filler, vague hype, unsupported claims, and inflated language.
+You adapt to the channel while preserving the brand voice and making the final output display-ready.
+
+Format every answer as clean Markdown that can be shown directly in a content card."""
 
 CONTENT_USER_PROMPT = """Write marketing content based on the following brief.
 
@@ -183,16 +185,34 @@ CONTENT BRIEF:
 - Objective: {objective}
 - CTA: {cta}
 
-REQUIREMENTS:
-1. Match the brand voice EXACTLY — read the examples and mimic their style
-2. Start with a scroll-stopping hook (first 2 lines are critical)
-3. Include the specified CTA naturally
-4. Optimize for {channel} format and best practices
-5. Length appropriate for the channel
-6. Include 3-5 relevant hashtags (if appropriate for channel)
-7. Suggest an image concept/prompt
+OUTPUT FORMAT:
+Write display-ready Markdown with this structure:
 
-Write the content now. Be creative, authentic, and on-brand."""
+## Hook
+One or two sharp opening lines. No generic questions like "Are you ready?"
+
+## Post
+The final post body. Use short paragraphs or bullets where useful. Keep it specific to the business, audience, and topic.
+
+## Proof Angle
+One concise line tying the post to a real business signal, customer pain, offer, location, social proof, or research-backed insight. Do not invent facts.
+
+## CTA
+Use this CTA naturally: {cta}
+
+## Hashtags
+3-5 relevant hashtags, only if appropriate for {channel}.
+
+## Image Idea
+One practical visual direction for a designer or image model.
+
+QUALITY BAR:
+- Match the brand voice exactly. Use examples as style references, not content to copy.
+- Make the first two lines strong enough to stand alone in a feed.
+- Prefer concrete nouns and verbs over buzzwords.
+- Avoid unsupported metrics, fake testimonials, and claims not implied by the research.
+- Keep it concise for the channel. Do not ramble.
+- Output only the Markdown content. No commentary before or after."""
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 4: SELF-VERIFICATION

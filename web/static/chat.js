@@ -22,6 +22,9 @@ const state = {
     businessUrl: "",
     extraContext: "",
     campaignId: null,
+    thinkingPanel: null,
+    thinkingHistory: [],
+    latestPreview: null,
 };
 
 function escapeHtml(value) {
@@ -64,6 +67,78 @@ function addUser(text) {
 function formatDetails(details) {
     if (typeof details === "string") return details;
     return JSON.stringify(details || {}, null, 2);
+}
+
+function friendlyStatus(data) {
+    const labels = {
+        starting: ["Preparing the run", "Setting up the research workspace."],
+        research: ["Searching public sources", "Looking across search, maps, social, and the website."],
+        research_complete: ["Research is ready", "Source coverage and business signals are collected."],
+        strategy: ["Building the strategy", "Turning research into content pillars and channels."],
+        strategy_complete: ["Strategy is ready", "Content pillars and channel direction are drafted."],
+        content: ["Generating content", "Writing posts from the strategy and brand voice."],
+        content_progress: ["Generating content", "A new post draft was created."],
+        verification: ["Checking quality", "Reviewing content for format and factual alignment."],
+        complete: ["Campaign ready", "The research, strategy, and content package are done."],
+        error: ["Something needs attention", data.message || "The run hit an error."],
+    };
+    return labels[data.phase] || ["Working", data.message || "The agent is still processing."];
+}
+
+function previewHtml(preview) {
+    if (!preview) return "";
+    if (preview.type === "research") {
+        return `
+            <div class="thinking-preview">
+                <small>Research snapshot</small>
+                <strong>${escapeHtml(preview.business_name || "Business")}</strong>
+                <p>${escapeHtml(preview.summary || "")}</p>
+            </div>
+        `;
+    }
+    if (preview.type === "strategy") {
+        return `
+            <div class="thinking-preview">
+                <small>Strategy snapshot</small>
+                <strong>${escapeHtml(preview.pillars || 0)} pillars · ${escapeHtml(preview.channels || 0)} channels</strong>
+                <p>${escapeHtml(preview.summary || "Strategy direction is ready.")}</p>
+            </div>
+        `;
+    }
+    if (preview.type === "content") {
+        return `
+            <div class="thinking-preview">
+                <small>${escapeHtml(preview.channel || "Content")} draft</small>
+                <strong>${escapeHtml(preview.headline || preview.topic || "Generated post")}</strong>
+                <p>${escapeHtml(preview.excerpt || "")}</p>
+            </div>
+        `;
+    }
+    return `
+        <div class="thinking-preview">
+            <small>Latest update</small>
+            <p>${escapeHtml(preview.message || "")}</p>
+        </div>
+    `;
+}
+
+function ensureThinkingPanel() {
+    if (state.thinkingPanel) return state.thinkingPanel;
+    const node = addMessage("assistant", `
+        <div class="thinking-card is-running">
+            <div class="thinking-lines">
+                <div class="thinking-line-primary"><span class="pulse-dot"></span><span data-thinking-primary>Preparing the run</span></div>
+                <div class="thinking-line-secondary" data-thinking-secondary>Setting up the research workspace.</div>
+            </div>
+            <div data-thinking-preview></div>
+            <details class="thinking-box">
+                <summary>Thinking / searching details</summary>
+                <div class="thinking-body" data-thinking-history></div>
+            </details>
+        </div>
+    `);
+    state.thinkingPanel = node;
+    return node;
 }
 
 function setSuggestions(items) {
@@ -236,32 +311,45 @@ function connectPipeline(campaignId) {
 }
 
 function renderProgressEvent(data) {
-    const title = {
-        searching: "Search details",
-        thinking: "Model thinking details",
-        tool_result: "Generated output details",
-        phase_complete: "Phase summary",
-        complete: "Completion details",
-        error: "Error details",
-    }[data.event_type] || "Pipeline details";
-    const prefix = {
-        searching: "Searching",
-        thinking: "Thinking",
-        tool_result: "Tool result",
-        phase_complete: "Phase complete",
-        complete: "Done",
-        error: "Error",
-    }[data.event_type] || data.phase || "Working";
-    addAssistant(`${prefix}: ${data.message || "Working..."}`, {
-        details: {
-            phase: data.phase,
-            progress: data.progress,
-            ...(data.details || {}),
-            ...(data.data ? { data: data.data } : {}),
-        },
-        detailTitle: title,
-        open: data.event_type === "error",
+    const panel = ensureThinkingPanel();
+    const [primary, secondary] = friendlyStatus(data);
+    const primaryNode = panel.querySelector("[data-thinking-primary]");
+    const secondaryNode = panel.querySelector("[data-thinking-secondary]");
+    const historyNode = panel.querySelector("[data-thinking-history]");
+    const previewNode = panel.querySelector("[data-thinking-preview]");
+    const card = panel.querySelector(".thinking-card");
+
+    if (data.preview) {
+        state.latestPreview = data.preview;
+    }
+    state.thinkingHistory.push({
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        phase: data.phase,
+        message: data.message,
+        progress: data.progress,
+        details: data.details || data.data || {},
     });
+
+    primaryNode.textContent = primary;
+    secondaryNode.textContent = data.preview?.message || secondary;
+    previewNode.innerHTML = previewHtml(state.latestPreview);
+    historyNode.textContent = state.thinkingHistory
+        .slice(-18)
+        .map((item) => `[${item.time}] ${item.phase || "run"} (${item.progress || 0}%): ${item.message || ""}\n${formatDetails(item.details)}`)
+        .join("\n\n");
+
+    if (data.phase === "complete" || data.event_type === "complete") {
+        card.classList.remove("is-running");
+        primaryNode.textContent = "Campaign ready";
+        secondaryNode.textContent = "Results are below. You can open the full workspace or calendar.";
+    }
+    if (data.event_type === "error") {
+        card.classList.remove("is-running");
+        primaryNode.textContent = "The run needs attention";
+        secondaryNode.textContent = data.message || "Something went wrong.";
+        panel.querySelector("details")?.setAttribute("open", "");
+    }
+    scrollToBottom();
 }
 
 async function renderResults(campaignId) {
@@ -296,11 +384,14 @@ async function renderResults(campaignId) {
     });
 
     posts.slice(0, 3).forEach((post) => {
+        const bodyHtml = window.renderMarkdown
+            ? window.renderMarkdown(post.body || "")
+            : escapeHtml(post.body || "");
         addMessage("assistant", `
             <div class="post-card">
                 <small>${escapeHtml(post.channel || "Post")} / ${escapeHtml(post.format || "single")}</small>
                 <h3>${escapeHtml(post.headline || post.title || "Generated post")}</h3>
-                <p>${escapeHtml(post.body || "").slice(0, 520)}</p>
+                <div class="markdown-body">${bodyHtml}</div>
                 <button class="copy-button" data-copy="${escapeHtml([post.headline, post.body, post.cta].filter(Boolean).join("\\n\\n"))}">Copy post</button>
             </div>
         `);

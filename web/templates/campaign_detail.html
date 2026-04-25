@@ -118,14 +118,18 @@
 </section>
 
 <section id="tab-content" class="tab-content">
-    <div class="page-grid">
+    <div class="content-grid">
         {% for post in posts %}
-        <article class="card">
-            <p class="microcopy">{{ post.channel }} / {{ post.format }}</p>
-            <h2>{{ post.headline or post.title }}</h2>
-            <p>{{ post.body }}</p>
-            <p><strong>{{ post.cta }}</strong></p>
-            <button class="copy-button" data-copy="{{ (post.headline or '') ~ '\n\n' ~ (post.body or '') ~ '\n\n' ~ (post.cta or '') }}">Copy</button>
+        <article class="card content-card">
+            <div>
+                <p class="microcopy">{{ post.channel }} / {{ post.format }} / {{ post.status }}</p>
+                <h2>{{ post.headline or post.title }}</h2>
+            </div>
+            <div class="content-card-body markdown-body" data-markdown>{{ post.body }}</div>
+            <div>
+                {% if post.cta %}<p><strong>{{ post.cta }}</strong></p>{% endif %}
+                <button class="copy-button" data-copy="{{ (post.headline or '') ~ '\n\n' ~ (post.body or '') ~ '\n\n' ~ (post.cta or '') }}">Copy</button>
+            </div>
         </article>
         {% else %}
         <article class="card">No posts generated yet.</article>

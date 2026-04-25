@@ -149,7 +149,7 @@ input {
 main {
     max-width: 1180px;
     margin: 0 auto;
-    padding: 18px 24px 56px;
+    padding: 12px 24px 28px;
 }
 
 .chat-hero {
@@ -157,7 +157,7 @@ main {
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 28px;
     align-items: end;
-    margin: 28px 0 26px;
+    margin: 14px 0 18px;
 }
 
 .microcopy,
@@ -171,9 +171,9 @@ main {
 
 .hero-copy h1 {
     max-width: 760px;
-    margin: 10px 0 14px;
+    margin: 8px 0 10px;
     font-family: "Instrument Serif", serif;
-    font-size: clamp(56px, 8vw, 112px);
+    font-size: clamp(42px, 6.8vw, 84px);
     font-weight: 400;
     letter-spacing: -0.065em;
     line-height: 0.86;
@@ -182,8 +182,8 @@ main {
 .hero-subtitle {
     max-width: 620px;
     color: var(--muted);
-    font-size: 18px;
-    line-height: 1.65;
+    font-size: 16px;
+    line-height: 1.55;
 }
 
 .recent-card,
@@ -242,12 +242,15 @@ main {
 .chat-app {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
-    min-height: 660px;
+    height: clamp(560px, calc(100vh - 250px), 720px);
+    min-height: 0;
     border-radius: 34px;
     overflow: hidden;
 }
 
 .chat-rail {
+    min-height: 0;
+    overflow-y: auto;
     padding: 22px;
     border-right: 1px solid var(--line);
     background: rgba(255, 250, 240, 0.38);
@@ -288,7 +291,8 @@ main {
 .chat-panel {
     display: grid;
     grid-template-rows: 1fr auto auto;
-    min-height: 660px;
+    min-height: 0;
+    height: 100%;
 }
 
 .messages {
@@ -296,7 +300,9 @@ main {
     flex-direction: column;
     gap: 16px;
     padding: 28px;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .message {
@@ -443,6 +449,65 @@ main {
     background: rgba(255, 255, 255, 0.42);
 }
 
+.thinking-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.thinking-card.is-running::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    animation: shimmer 1.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.thinking-lines {
+    display: grid;
+    gap: 6px;
+    position: relative;
+}
+
+.thinking-line-primary {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 900;
+}
+
+.thinking-line-secondary {
+    color: var(--muted);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 0 0 0 rgba(184, 107, 69, 0.35);
+    animation: pulse 1.4s infinite;
+}
+
+.thinking-preview {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 250, 240, 0.62);
+}
+
+.thinking-preview small {
+    display: block;
+    color: var(--muted);
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+
 .thinking-box summary {
     padding: 12px 14px;
     cursor: pointer;
@@ -457,6 +522,8 @@ main {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 12px;
     white-space: pre-wrap;
+    max-height: 210px;
+    overflow: auto;
 }
 
 .result-card,
@@ -466,6 +533,91 @@ main {
     border: 1px solid var(--line);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.5);
+}
+
+.message .post-card .markdown-body {
+    max-height: 220px;
+    overflow: auto;
+    margin: 10px 0;
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 18px;
+    align-items: stretch;
+}
+
+.content-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 440px;
+    max-height: 520px;
+}
+
+.content-card-body {
+    min-height: 0;
+    overflow: auto;
+    margin: 14px 0;
+    padding-right: 6px;
+}
+
+.markdown-body {
+    line-height: 1.65;
+    color: var(--ink);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+    margin: 0.85em 0 0.35em;
+    line-height: 1.1;
+}
+
+.markdown-body h1 {
+    font-family: "Instrument Serif", serif;
+    font-size: 34px;
+    font-weight: 400;
+    letter-spacing: -0.04em;
+}
+
+.markdown-body h2 {
+    font-size: 20px;
+}
+
+.markdown-body h3 {
+    font-size: 16px;
+}
+
+.markdown-body p {
+    margin: 0 0 0.8em;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+    margin: 0.4em 0 1em;
+    padding-left: 1.25em;
+}
+
+.markdown-body li {
+    margin: 0.25em 0;
+}
+
+.markdown-body strong {
+    font-weight: 900;
+}
+
+.markdown-body a {
+    color: var(--accent-2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.markdown-body code {
+    padding: 2px 5px;
+    border-radius: 7px;
+    background: rgba(23, 21, 18, 0.08);
+    font-size: 0.92em;
 }
 
 .result-grid {
@@ -575,6 +727,7 @@ main {
     background: rgba(23, 21, 18, 0.07);
     font-size: 11px;
     font-weight: 800;
+    line-height: 1.35;
 }
 
 .hidden {
@@ -589,6 +742,24 @@ main {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes shimmer {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes pulse {
+    70% {
+        box-shadow: 0 0 0 10px rgba(184, 107, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(184, 107, 69, 0);
     }
 }
 
@@ -611,7 +782,7 @@ main {
     }
 
     .hero-copy h1 {
-        font-size: 58px;
+        font-size: 48px;
     }
 
     .calendar-grid {

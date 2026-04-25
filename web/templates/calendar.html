@@ -10,7 +10,7 @@
         <p class="hero-subtitle">A quiet view of approved, scheduled, and published posts from generated campaigns.</p>
     </div>
     <aside class="recent-card">
-        <div class="recent-card-head"><span>Visible posts</span><strong>{{ posts|length }}</strong></div>
+        <div class="recent-card-head"><span>Generated posts</span><strong>{{ posts|length }}</strong></div>
         <button class="btn" onclick="changeMonth(-1)">Previous</button>
         <button class="btn" onclick="changeMonth(1)">Next</button>
     </aside>
@@ -18,6 +18,9 @@
 
 <section class="calendar-shell">
     <h2 id="month-label"></h2>
+    {% if not posts %}
+    <p class="empty-note">No generated posts yet. Run a campaign from the chat to fill the calendar.</p>
+    {% endif %}
     <div class="calendar-grid" id="calendar-grid"></div>
 </section>
 {% endblock %}
@@ -42,7 +45,11 @@ function renderCalendar() {
         html += `<div class="calendar-day"><strong>${day}</strong>`;
         dayPosts.forEach((post) => {
             const campaign = campaigns.find((item) => item.id === post.campaign_id);
-            html += `<a class="post-chip" href="/campaign/${post.campaign_id}">${post.channel || 'Post'}: ${(post.title || campaign?.name || 'Untitled').slice(0, 28)}</a>`;
+            html += `<a class="post-chip" href="/campaign/${post.campaign_id}">`;
+            html += `${post.channel || 'Post'} · ${post.status || 'draft'}<br>`;
+            html += `<strong>${(post.title || 'Untitled').slice(0, 34)}</strong><br>`;
+            html += `<small>${post.campaign_name || campaign?.name || 'Campaign'}</small>`;
+            html += `</a>`;
         });
         html += '</div>';
     }

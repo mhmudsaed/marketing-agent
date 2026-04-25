@@ -75,6 +75,7 @@ def post_to_dict(post):
         "char_count": post.char_count,
         "reading_time": post.reading_time,
         "campaign_id": post.campaign_id,
+        "campaign_name": post.campaign.name if post.campaign else None,
     }
 
 def campaign_to_dict(c):
@@ -186,7 +187,12 @@ async def campaign_detail(request: Request, campaign_id: int, db: Session = Depe
 
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_view(request: Request, db: Session = Depends(get_db)):
-    posts = db.query(Post).filter(Post.status.in_(["approved", "scheduled", "published"])).all()
+    posts = (
+        db.query(Post)
+        .filter(Post.date.isnot(None))
+        .order_by(Post.date.asc(), Post.time.asc())
+        .all()
+    )
     campaigns = db.query(Campaign).all()
     return templates.TemplateResponse(request, "calendar.html", chat_context(
         request,
@@ -469,6 +475,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
         "event_type": "thinking",
         "progress": 0,
         "message": "Starting pipeline...",
+        "preview": {
+            "type": "status",
+            "message": "Preparing the workspace and model connection.",
+        },
         "details": {"campaign_id": campaign_id}
     })
     
@@ -491,6 +501,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "searching",
                 "progress": 10,
                 "message": "Searching with SerpApi, Tavily, and Firecrawl...",
+                "preview": {
+                    "type": "status",
+                    "message": "Scanning the website, public search results, maps, reviews, and social profiles.",
+                },
                 "details": {
                     "model_mode": campaign.model_mode,
                     "model": selected_model,
@@ -538,6 +552,13 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "phase_complete",
                 "progress": 25,
                 "message": f"Research complete: {research_result.business.name}",
+                "preview": {
+                    "type": "research",
+                    "business_name": research_result.business.name,
+                    "summary": research_result.summary[:280],
+                    "confidence": research_result.confidence_score,
+                    "sources": research_result.search_tool_coverage.total_sources,
+                },
                 "data": {
                     "business_name": research_result.business.name,
                     "confidence": research_result.confidence_score,
@@ -556,6 +577,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "thinking",
                 "progress": 30,
                 "message": "Synthesizing strategy with the selected model...",
+                "preview": {
+                    "type": "status",
+                    "message": "Turning research signals into pillars, channels, and a posting plan.",
+                },
                 "details": {
                     "model": selected_model,
                     "inputs": ["research summary", "audience", "brand voice", "source coverage"],
@@ -578,7 +603,13 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "strategy_complete",
                 "event_type": "phase_complete",
                 "progress": 40,
-                "message": f"Strategy ready: {len(strategy_result.pillars)} pillars, {len(strategy_result.channels)} channels"
+                "message": f"Strategy ready: {len(strategy_result.pillars)} pillars, {len(strategy_result.channels)} channels",
+                "preview": {
+                    "type": "strategy",
+                    "pillars": len(strategy_result.pillars),
+                    "channels": len(strategy_result.channels),
+                    "summary": strategy_result.overall_strategy[:280],
+                },
             })
             
             # Phase 3: Content
@@ -590,6 +621,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "thinking",
                 "progress": 45,
                 "message": f"Generating {len(strategy_result.calendar)} posts...",
+                "preview": {
+                    "type": "status",
+                    "message": "Writing campaign posts in the selected brand voice.",
+                },
                 "details": {
                     "model": selected_model,
                     "calendar_items": len(strategy_result.calendar),
@@ -632,6 +667,13 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                     "event_type": "tool_result",
                     "progress": progress,
                     "message": f"Generated post {idx + 1}/{len(content_result.contents)}: {content.topic}",
+                    "preview": {
+                        "type": "content",
+                        "channel": content.channel,
+                        "headline": content.headline,
+                        "topic": content.topic,
+                        "excerpt": content.body[:260],
+                    },
                     "post_index": idx,
                     "details": {
                         "channel": content.channel,
@@ -649,6 +691,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "thinking",
                 "progress": 80,
                 "message": "Verifying content quality...",
+                "preview": {
+                    "type": "status",
+                    "message": "Checking format, brand voice, factual alignment, and quality.",
+                },
                 "details": {"checks": ["brand alignment", "facts", "format", "quality"]},
             })
             
@@ -668,6 +714,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "event_type": "complete",
                 "progress": 100,
                 "message": "Campaign ready! All posts generated and verified.",
+                "preview": {
+                    "type": "status",
+                    "message": "The full campaign package is ready to review.",
+                },
                 "campaign_id": campaign_id
             })
     

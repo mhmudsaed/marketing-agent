@@ -166,10 +166,16 @@ class ContentEngine:
         # First non-empty line is headline/hook
         headline = ""
         body_start = 0
+        ignored_headings = {"hook", "post", "body", "caption", "content"}
         for i, line in enumerate(lines):
             stripped = line.strip()
+            if not stripped:
+                continue
+            normalized = stripped.lstrip("#").strip().lower()
+            if normalized in ignored_headings:
+                continue
             if stripped:
-                headline = stripped
+                headline = stripped.lstrip("#").strip()
                 body_start = i + 1
                 break
         
@@ -183,7 +189,7 @@ class ContentEngine:
                 # Simple heuristic: last line might be CTA if short and action-oriented
                 last = last_lines[-1]
                 if len(last) < 150 and any(w in last.lower() for w in ["click", "learn", "try", "get", "visit", "sign", "download", "follow"]):
-                    cta = last
+                    cta = last.lstrip("#").replace("**", "").strip()
         
         return headline, body, cta
     
