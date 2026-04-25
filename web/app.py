@@ -14,28 +14,28 @@ from sqlalchemy.orm import Session
 
 from web.database import init_db, get_db, SessionLocal, Campaign, Research, Strategy, Post, BrandVoiceTemplate
 from core.pipeline import MarketingPipeline
-from clients.openrouter import OpenRouterClient
 from config.settings import settings
 from utils.logger import logger
 
-# Get absolute paths
+# ═══════════════════════════════════════════════════════════════
+# SETUP
+# ═══════════════════════════════════════════════════════════════
+
 WEB_DIR = Path(__file__).parent
-BASE_DIR = WEB_DIR.parent
 
-# Initialize DB on startup
-init_db()
-
-# Templates and static files
+# Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 jinja_env = Environment(
     loader=FileSystemLoader(str(WEB_DIR / "templates")),
     autoescape=select_autoescape(['html', 'xml']),
-    cache_size=0  # Disable cache to avoid the bug
+    cache_size=0
 )
 templates = Jinja2Templates(env=jinja_env)
 
+# DB init
+init_db()
 
-
+# App
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -50,39 +50,10 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
 # ═══════════════════════════════════════════════════════════════
-# PAGE ROUTES
+# HELPERS
 # ═══════════════════════════════════════════════════════════════
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, db: Session = Depends(get_db)):
-    """Main dashboard with all campaigns."""
-    campaigns = db.query(Campaign).order_by(Campaign.created_at.desc()).all()
-    stats = {
-        "total": len(campaigns),
-        "ready": sum(1 for c in campaigns if c.status == "ready"),
-        "published": sum(1 for c in campaigns if c.status == "published"),
-        "in_progress": sum(1 for c in campaigns if c.status not in ["ready", "published", "draft"])
-    }
-    return templates.TemplateResponse(request, "dashboard.html", {
-        "campaigns": campaigns,
-        "stats": stats
-    })
-
-@app.get("/campaign/new", response_class=HTMLResponse)
-async def new_campaign_page(request: Request):
-    """Page to create a new campaign."""
-    return templates.TemplateResponse(request, "new_campaign.html", {
-        "models": [
-            "openai/gpt-4o-mini",
-            "anthropic/claude-3.5-sonnet",
-            "openai/gpt-4o",
-            "google/gemini-2.0-flash-001"
-        ]
-    })
-
-@app.get("/campaign/{campaign_id}", response_class=HTMLResponse)
 def post_to_dict(post):
-    """Convert Post model to plain dict for JSON serialization."""
     return {
         "id": post.id,
         "title": post.title,
@@ -106,7 +77,6 @@ def post_to_dict(post):
     }
 
 def campaign_to_dict(c):
-    """Convert Campaign model to plain dict for JSON serialization."""
     return {
         "id": c.id,
         "name": c.name,
@@ -114,9 +84,37 @@ def campaign_to_dict(c):
         "status": c.status,
     }
 
+# ═══════════════════════════════════════════════════════════════
+# PAGE ROUTES
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request, db: Session = Depends(get_db)):
+    campaigns = db.query(Campaign).order_by(Campaign.created_at.desc()).all()
+    stats = {
+        "total": len(campaigns),
+        "ready": sum(1 for c in campaigns if c.status == "ready"),
+        "published": sum(1 for c in campaigns if c.status == "published"),
+        "in_progress": sum(1 for c in campaigns if c.status not in ["ready", "published", "draft"])
+    }
+    return templates.TemplateResponse(request, "dashboard.html", {
+        "campaigns": campaigns,
+        "stats": stats
+    })
+
+@app.get("/campaign/new", response_class=HTMLResponse)
+async def new_campaign_page(request: Request):
+    return templates.TemplateResponse(request, "new_campaign.html", {
+        "models": [
+            "openai/gpt-4o-mini",
+            "anthropic/claude-3.5-sonnet",
+            "openai/gpt-4o",
+            "google/gemini-2.0-flash-001"
+        ]
+    })
+
 @app.get("/campaign/{campaign_id}", response_class=HTMLResponse)
 async def campaign_detail(request: Request, campaign_id: int, db: Session = Depends(get_db)):
-    """Campaign detail page with all tabs."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -132,7 +130,6 @@ async def campaign_detail(request: Request, campaign_id: int, db: Session = Depe
 
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_view(request: Request, db: Session = Depends(get_db)):
-    """Visual content calendar."""
     posts = db.query(Post).filter(Post.status.in_(["approved", "scheduled", "published"])).all()
     campaigns = db.query(Campaign).all()
     return templates.TemplateResponse(request, "calendar.html", {
@@ -142,7 +139,6 @@ async def calendar_view(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, db: Session = Depends(get_db)):
-    """Settings page."""
     brand_voices = db.query(BrandVoiceTemplate).all()
     return templates.TemplateResponse(request, "settings.html", {
         "brand_voices": brand_voices,
@@ -162,7 +158,6 @@ async def create_campaign(
     posts_per_week: int = Form(3),
     db: Session = Depends(get_db)
 ):
-    """Create a new campaign and start pipeline."""
     campaign = Campaign(
         name=name,
         business_url=url,
@@ -172,12 +167,10 @@ async def create_campaign(
     db.add(campaign)
     db.commit()
     db.refresh(campaign)
-    
     return {"id": campaign.id, "status": "created"}
 
 @app.get("/api/campaigns")
 async def list_campaigns(db: Session = Depends(get_db)):
-    """List all campaigns."""
     campaigns = db.query(Campaign).order_by(Campaign.created_at.desc()).all()
     return [
         {
@@ -194,7 +187,6 @@ async def list_campaigns(db: Session = Depends(get_db)):
 
 @app.get("/api/campaigns/{campaign_id}")
 async def get_campaign(campaign_id: int, db: Session = Depends(get_db)):
-    """Get campaign details."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -232,7 +224,6 @@ async def get_campaign(campaign_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/campaigns/{campaign_id}/research")
 async def get_research(campaign_id: int, db: Session = Depends(get_db)):
-    """Get research data for a campaign."""
     research = db.query(Research).filter(Research.campaign_id == campaign_id).first()
     if not research:
         raise HTTPException(status_code=404, detail="Research not found")
@@ -259,7 +250,6 @@ async def get_research(campaign_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/campaigns/{campaign_id}/posts")
 async def get_posts(campaign_id: int, status: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get posts for a campaign."""
     query = db.query(Post).filter(Post.campaign_id == campaign_id)
     if status:
         query = query.filter(Post.status == status)
@@ -289,12 +279,7 @@ async def get_posts(campaign_id: int, status: Optional[str] = None, db: Session 
     ]
 
 @app.put("/api/posts/{post_id}")
-async def update_post(
-    post_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Update a post."""
+async def update_post(post_id: int, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
@@ -306,63 +291,50 @@ async def update_post(
     
     post.updated_at = datetime.utcnow()
     db.commit()
-    
     return {"status": "updated"}
 
 @app.post("/api/posts/{post_id}/approve")
 async def approve_post(post_id: int, db: Session = Depends(get_db)):
-    """Approve a post."""
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
     post.status = "approved"
     db.commit()
     return {"status": "approved"}
 
 @app.post("/api/posts/{post_id}/reject")
 async def reject_post(post_id: int, db: Session = Depends(get_db)):
-    """Reject a post."""
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
     post.status = "rejected"
     db.commit()
     return {"status": "rejected"}
 
 @app.post("/api/posts/{post_id}/publish")
 async def publish_post(post_id: int, db: Session = Depends(get_db)):
-    """Publish a post immediately."""
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    # TODO: Implement actual publishing to social platforms
     post.status = "published"
     post.published_at = datetime.utcnow()
     db.commit()
-    
     return {"status": "published", "message": "Post marked as published (actual platform integration pending)"}
 
 @app.delete("/api/campaigns/{campaign_id}")
 async def delete_campaign(campaign_id: int, db: Session = Depends(get_db)):
-    """Delete a campaign and all its data."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    
     db.delete(campaign)
     db.commit()
     return {"status": "deleted"}
 
 # ═══════════════════════════════════════════════════════════════
-# WEBSOCKET FOR REAL-TIME PIPELINE
+# WEBSOCKET
 # ═══════════════════════════════════════════════════════════════
 
 class PipelineManager:
-    """Manages pipeline execution with progress tracking."""
-    
     def __init__(self):
         self.active_connections: dict[int, WebSocket] = {}
     
@@ -385,7 +357,6 @@ pipeline_manager = PipelineManager()
 
 @app.websocket("/ws/pipeline/{campaign_id}")
 async def pipeline_websocket(websocket: WebSocket, campaign_id: int):
-    """WebSocket for real-time pipeline progress."""
     await pipeline_manager.connect(campaign_id, websocket)
     db = SessionLocal()
     
@@ -395,7 +366,6 @@ async def pipeline_websocket(websocket: WebSocket, campaign_id: int):
             command = json.loads(data)
             
             if command.get("action") == "start":
-                # Start pipeline in background
                 asyncio.create_task(
                     run_pipeline_with_progress(campaign_id, db, pipeline_manager)
                 )
@@ -404,12 +374,7 @@ async def pipeline_websocket(websocket: WebSocket, campaign_id: int):
     finally:
         db.close()
 
-async def run_pipeline_with_progress(
-    campaign_id: int,
-    db: Session,
-    manager: PipelineManager
-):
-    """Run pipeline and send progress updates."""
+async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: PipelineManager):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         return
@@ -434,7 +399,6 @@ async def run_pipeline_with_progress(
             
             research_result = await pipeline.run_research_only(campaign.business_url)
             
-            # Save research
             research = Research(
                 campaign_id=campaign_id,
                 business_name=research_result.business.name,
@@ -556,7 +520,6 @@ async def run_pipeline_with_progress(
                 "message": "Verifying content quality..."
             })
             
-            # Quick verification (skip heavy LLM checks for speed)
             posts = db.query(Post).filter(Post.campaign_id == campaign_id).all()
             for post in posts:
                 post.verification_score = 0.85
@@ -584,10 +547,6 @@ async def run_pipeline_with_progress(
             "progress": 0,
             "message": f"Error: {str(e)}"
         })
-
-# ═══════════════════════════════════════════════════════════════
-# HEALTH CHECK
-# ═══════════════════════════════════════════════════════════════
 
 @app.get("/api/health")
 async def health_check():
