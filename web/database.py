@@ -109,7 +109,7 @@ class Post(Base):
     image_url = Column(String(500))
     
     # Status
-    status = Column(String(50), default="draft")  # draft, approved, scheduled, published, rejected
+    status = Column(String(50), default="draft")  # draft, approved, scheduled, publishing, published, publish_failed, rejected
     
     # Verification
     verification_score = Column(Float, default=0.0)
@@ -130,6 +130,22 @@ class Post(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     campaign = relationship("Campaign", back_populates="posts")
+    publishing_logs = relationship("PublishingLog", back_populates="post", order_by="PublishingLog.created_at")
+
+class PublishingLog(Base):
+    __tablename__ = "publishing_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id"))
+    platform = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False)
+    message = Column(Text)
+    error = Column(Text)
+    platform_post_url = Column(String(500))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    published_at = Column(DateTime)
+
+    post = relationship("Post", back_populates="publishing_logs")
 
 class BrandVoiceTemplate(Base):
     __tablename__ = "brand_voice_templates"

@@ -44,6 +44,15 @@ class Settings:
     # Firecrawl
     FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
     
+    # Playwright / X publishing
+    PLAYWRIGHT_USER_DATA_DIR: Path = Path(os.getenv("PLAYWRIGHT_USER_DATA_DIR", "./outputs/playwright/x-profile"))
+    PLAYWRIGHT_HEADLESS: bool = os.getenv("PLAYWRIGHT_HEADLESS", "false").lower() == "true"
+    PLAYWRIGHT_SLOW_MO_MS: int = int(os.getenv("PLAYWRIGHT_SLOW_MO_MS", "150"))
+    PLAYWRIGHT_DRY_RUN: bool = os.getenv("PLAYWRIGHT_DRY_RUN", "false").lower() == "true"
+    PLAYWRIGHT_BROWSER_CHANNEL: str = os.getenv("PLAYWRIGHT_BROWSER_CHANNEL", "")
+    X_COMPOSE_URL: str = os.getenv("X_COMPOSE_URL", "https://x.com/compose/post")
+    X_LOGIN_URL: str = os.getenv("X_LOGIN_URL", "https://x.com/i/flow/login")
+    
     # Pipeline
     MAX_RESEARCH_DEPTH: int = int(os.getenv("MAX_RESEARCH_DEPTH", "3"))
     MAX_OSINT_PAGES: int = int(os.getenv("MAX_OSINT_PAGES", "8"))

@@ -122,13 +122,23 @@
         {% for post in posts %}
         <article class="card content-card">
             <div>
-                <p class="microcopy">{{ post.channel }} / {{ post.format }} / {{ post.status }}</p>
+                <p class="microcopy">{{ post.channel }} / {{ post.format }}</p>
+                <span class="status-badge status-{{ post.status or 'draft' }}" data-status-for="{{ post.id }}">{{ post.status or 'draft' }}</span>
                 <h2>{{ post.headline or post.title }}</h2>
             </div>
             <div class="content-card-body markdown-body" data-markdown>{{ post.body }}</div>
             <div>
                 {% if post.cta %}<p><strong>{{ post.cta }}</strong></p>{% endif %}
-                <button class="copy-button" data-copy="{{ (post.headline or '') ~ '\n\n' ~ (post.body or '') ~ '\n\n' ~ (post.cta or '') }}">Copy</button>
+                <div class="publish-status" data-publish-status="{{ post.id }}">
+                    {% if post.publish_error %}{{ post.publish_error }}{% elif post.published_at %}Published to X{% else %}Ready for review. X publishing will auto-fit this into 280 characters.{% endif %}
+                </div>
+                <div class="content-actions">
+                    <button class="copy-button" data-copy="{{ (post.headline or '') ~ '\n\n' ~ (post.body or '') ~ '\n\n' ~ (post.cta or '') }}">Copy</button>
+                    <button class="copy-button publish-button" data-publish-post="{{ post.id }}" {% if post.status == 'publishing' or post.status == 'published' %}disabled{% endif %}>
+                        {% if post.status == 'published' %}Published{% else %}Publish to X{% endif %}
+                    </button>
+                    <button class="copy-button login-button" data-open-x-login hidden>Open X login</button>
+                </div>
             </div>
         </article>
         {% else %}
@@ -167,6 +177,63 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
     button.addEventListener('click', async () => {
         await navigator.clipboard.writeText(button.dataset.copy);
         button.textContent = 'Copied';
+    });
+});
+
+function setPostPublishUi(postId, status, message) {
+    const badge = document.querySelector(`[data-status-for="${postId}"]`);
+    const statusNode = document.querySelector(`[data-publish-status="${postId}"]`);
+    const publishButton = document.querySelector(`[data-publish-post="${postId}"]`);
+    if (badge) {
+        badge.textContent = status;
+        badge.className = `status-badge status-${status}`;
+    }
+    if (statusNode) statusNode.textContent = message || status;
+    if (publishButton) {
+        publishButton.disabled = status === 'publishing' || status === 'published';
+        publishButton.textContent = status === 'published' ? 'Published' : 'Publish to X';
+    }
+}
+
+async function openXLogin(button) {
+    button.disabled = true;
+    button.textContent = 'Opening X login...';
+    const response = await fetch('/api/publishing/x/open-login', { method: 'POST' });
+    const data = await response.json();
+    button.disabled = false;
+    button.textContent = 'Open X login';
+    alert(data.message || 'X login opened.');
+}
+
+document.querySelectorAll('[data-open-x-login]').forEach((button) => {
+    button.addEventListener('click', () => openXLogin(button));
+});
+
+document.querySelectorAll('[data-publish-post]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const postId = button.dataset.publishPost;
+        const card = button.closest('.content-card');
+        const loginButton = card.querySelector('[data-open-x-login]');
+        loginButton.hidden = true;
+        setPostPublishUi(postId, 'publishing', 'Opening X, checking your session, and filling the composer...');
+        button.disabled = true;
+
+        const response = await fetch(`/api/posts/${postId}/publish`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            const count = data.char_count ? ` (${data.char_count}/280 characters)` : '';
+            setPostPublishUi(postId, data.status === 'dry_run' ? 'approved' : 'published', `${data.message || 'Post published to X.'}${count}`);
+            return;
+        }
+
+        if (data.status === 'login_required') {
+            loginButton.hidden = false;
+            setPostPublishUi(postId, 'publish_failed', data.message || 'X login is required.');
+            return;
+        }
+
+        setPostPublishUi(postId, 'publish_failed', data.message || 'Publishing failed. Please try again.');
     });
 });
 </script>

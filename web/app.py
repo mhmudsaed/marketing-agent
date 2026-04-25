@@ -12,9 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from web.database import init_db, get_db, SessionLocal, Campaign, Research, Strategy, Post, BrandVoiceTemplate
+from web.database import init_db, get_db, SessionLocal, Campaign, Research, Strategy, Post, BrandVoiceTemplate, PublishingLog
 from core.pipeline import MarketingPipeline
 from clients.openrouter import OpenRouterClient
+from clients.playwright_x import XLoginRequired, XPlaywrightPublisher, XPlaywrightUnavailable, XPublishError
 from config.settings import settings
 from utils.logger import logger
 
@@ -76,6 +77,9 @@ def post_to_dict(post):
         "reading_time": post.reading_time,
         "campaign_id": post.campaign_id,
         "campaign_name": post.campaign.name if post.campaign else None,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "publish_error": post.publish_error,
+        "platform_post_id": post.platform_post_id,
     }
 
 def campaign_to_dict(c):
@@ -364,7 +368,10 @@ async def get_posts(campaign_id: int, status: Optional[str] = None, db: Session 
             "verification_score": p.verification_score,
             "image_prompt": p.image_prompt,
             "word_count": p.word_count,
-            "char_count": p.char_count
+            "char_count": p.char_count,
+            "publish_error": p.publish_error,
+            "published_at": p.published_at.isoformat() if p.published_at else None,
+            "platform_post_id": p.platform_post_id,
         }
         for p in posts
     ]
@@ -407,10 +414,113 @@ async def publish_post(post_id: int, db: Session = Depends(get_db)):
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    post.status = "published"
-    post.published_at = datetime.utcnow()
+
+    publisher = XPlaywrightPublisher()
+    text = publisher.format_x_post_text(post.headline or "", post.body or "", post.cta or "", post.hashtags or [])
+    post.status = "publishing"
+    post.publish_error = None
+    log = PublishingLog(
+        post_id=post.id,
+        platform="x",
+        status="publishing",
+        message="Opening X and preparing the composer.",
+    )
+    db.add(log)
     db.commit()
-    return {"status": "published", "message": "Post marked as published (actual platform integration pending)"}
+    db.refresh(log)
+
+    try:
+        result = await publisher.publish_text(text)
+        now = datetime.utcnow()
+        post.status = "published" if result.status in {"published", "dry_run"} else result.status
+        post.published_at = now if result.status == "published" else None
+        post.platform_post_id = result.platform_post_url
+        log.status = result.status
+        log.message = result.message
+        log.platform_post_url = result.platform_post_url
+        log.published_at = now if result.status == "published" else None
+        db.commit()
+        return {
+            "status": result.status,
+            "message": f"{result.message} Published X copy was {len(text)} characters.",
+            "platform_post_url": result.platform_post_url,
+            "published_text": text,
+            "char_count": len(text),
+            "post": post_to_dict(post),
+        }
+    except XLoginRequired as exc:
+        post.status = "publish_failed"
+        post.publish_error = "Login required. Open the X login window, sign in, then publish again."
+        log.status = "login_required"
+        log.message = post.publish_error
+        log.error = str(exc)
+        db.commit()
+        return JSONResponse(
+            status_code=409,
+            content={"status": "login_required", "message": post.publish_error},
+        )
+    except (XPlaywrightUnavailable, XPublishError) as exc:
+        post.status = "publish_failed"
+        post.publish_error = str(exc)
+        log.status = "failed"
+        log.message = "Publishing failed before the post was sent."
+        log.error = str(exc)
+        db.commit()
+        return JSONResponse(
+            status_code=400,
+            content={"status": "failed", "message": str(exc)},
+        )
+    except Exception as exc:
+        logger.error(f"Unexpected X publishing error for post {post_id}: {exc}")
+        post.status = "publish_failed"
+        post.publish_error = "X publishing failed unexpectedly. Try again after checking the browser session."
+        log.status = "failed"
+        log.message = post.publish_error
+        log.error = str(exc)
+        db.commit()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "failed", "message": post.publish_error},
+        )
+
+@app.get("/api/publishing/x/login-check")
+async def x_login_check():
+    publisher = XPlaywrightPublisher()
+    try:
+        result = await publisher.check_login()
+        status_code = 200 if result.status == "ready" else 409
+        return JSONResponse(status_code=status_code, content=result.__dict__)
+    except XPublishError as exc:
+        return JSONResponse(status_code=400, content={"status": "failed", "message": str(exc)})
+
+@app.post("/api/publishing/x/open-login")
+async def x_open_login():
+    publisher = XPlaywrightPublisher()
+    try:
+        result = await publisher.open_login()
+        return result.__dict__
+    except XPublishError as exc:
+        return JSONResponse(status_code=400, content={"status": "failed", "message": str(exc)})
+
+@app.get("/api/posts/{post_id}/publishing-logs")
+async def get_publishing_logs(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    logs = db.query(PublishingLog).filter(PublishingLog.post_id == post_id).order_by(PublishingLog.created_at.desc()).all()
+    return [
+        {
+            "id": log.id,
+            "platform": log.platform,
+            "status": log.status,
+            "message": log.message,
+            "error": log.error,
+            "platform_post_url": log.platform_post_url,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "published_at": log.published_at.isoformat() if log.published_at else None,
+        }
+        for log in logs
+    ]
 
 @app.delete("/api/campaigns/{campaign_id}")
 async def delete_campaign(campaign_id: int, db: Session = Depends(get_db)):
@@ -474,10 +584,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
         "phase": "starting",
         "event_type": "thinking",
         "progress": 0,
-        "message": "Starting pipeline...",
+        "message": "Starting your campaign run...",
         "preview": {
             "type": "status",
-            "message": "Preparing the workspace and model connection.",
+            "message": "Preparing the workspace, model, and research tools. This can take a few minutes.",
         },
         "details": {"campaign_id": campaign_id}
     })
@@ -500,10 +610,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "research",
                 "event_type": "searching",
                 "progress": 10,
-                "message": "Searching with SerpApi, Tavily, and Firecrawl...",
+                "message": "Research is running across search, maps, reviews, social profiles, and the website...",
                 "preview": {
                     "type": "status",
-                    "message": "Scanning the website, public search results, maps, reviews, and social profiles.",
+                    "message": "Reading the business footprint, checking Google Maps-style signals, and collecting public social proof.",
                 },
                 "details": {
                     "model_mode": campaign.model_mode,
@@ -551,7 +661,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "research_complete",
                 "event_type": "phase_complete",
                 "progress": 25,
-                "message": f"Research complete: {research_result.business.name}",
+                "message": f"Research complete for {research_result.business.name}. The agent found evidence and brand signals.",
                 "preview": {
                     "type": "research",
                     "business_name": research_result.business.name,
@@ -576,10 +686,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "strategy",
                 "event_type": "thinking",
                 "progress": 30,
-                "message": "Synthesizing strategy with the selected model...",
+                "message": "Building the strategy from the research evidence...",
                 "preview": {
                     "type": "status",
-                    "message": "Turning research signals into pillars, channels, and a posting plan.",
+                    "message": "Comparing audience, competitors, brand voice, and channels before drafting the plan.",
                 },
                 "details": {
                     "model": selected_model,
@@ -620,10 +730,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "content",
                 "event_type": "thinking",
                 "progress": 45,
-                "message": f"Generating {len(strategy_result.calendar)} posts...",
+                "message": f"Drafting {len(strategy_result.calendar)} posts from the approved strategy...",
                 "preview": {
                     "type": "status",
-                    "message": "Writing campaign posts in the selected brand voice.",
+                    "message": "Writing hooks, post bodies, proof angles, CTAs, hashtags, and image ideas.",
                 },
                 "details": {
                     "model": selected_model,
@@ -666,7 +776,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                     "phase": "content_progress",
                     "event_type": "tool_result",
                     "progress": progress,
-                    "message": f"Generated post {idx + 1}/{len(content_result.contents)}: {content.topic}",
+                    "message": f"Drafted post {idx + 1}/{len(content_result.contents)}: {content.topic}",
                     "preview": {
                         "type": "content",
                         "channel": content.channel,
@@ -690,10 +800,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "verification",
                 "event_type": "thinking",
                 "progress": 80,
-                "message": "Verifying content quality...",
+                "message": "Reviewing the finished drafts...",
                 "preview": {
                     "type": "status",
-                    "message": "Checking format, brand voice, factual alignment, and quality.",
+                    "message": "Checking format, brand voice, factual alignment, and publish readiness.",
                 },
                 "details": {"checks": ["brand alignment", "facts", "format", "quality"]},
             })
@@ -713,7 +823,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 "phase": "complete",
                 "event_type": "complete",
                 "progress": 100,
-                "message": "Campaign ready! All posts generated and verified.",
+                "message": "Campaign ready. All posts are generated, checked, and ready for review or publishing.",
                 "preview": {
                     "type": "status",
                     "message": "The full campaign package is ready to review.",

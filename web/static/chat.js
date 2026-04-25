@@ -25,6 +25,79 @@ const state = {
     thinkingPanel: null,
     thinkingHistory: [],
     latestPreview: null,
+    currentPhase: "starting",
+    activityTimer: null,
+    activityIndex: 0,
+    activityPhase: "",
+};
+
+const activityMessages = {
+    starting: [
+        "Opening the campaign workspace.",
+        "Preparing the research queue.",
+        "Checking model settings and tools.",
+        "Getting the source map ready.",
+    ],
+    research: [
+        "Looking on LinkedIn for public company and founder signals.",
+        "Scanning Google results for brand mentions and useful sources.",
+        "Checking local reviews, maps, and reputation signals.",
+        "Looking for competitors and market language.",
+        "Reading the website for offers, proof, audience, and tone.",
+        "Collecting social profiles and public footprint clues.",
+    ],
+    research_complete: [
+        "Compressing the research into the strongest facts.",
+        "Sorting source evidence by usefulness.",
+        "Pulling out positioning clues from the research.",
+    ],
+    strategy: [
+        "Turning research into content pillars.",
+        "Looking for sharp LinkedIn angles and hooks.",
+        "Mapping channels to the business goal.",
+        "Finding objections, pain points, and proof points.",
+        "Shaping a simple campaign narrative.",
+    ],
+    strategy_complete: [
+        "Preparing the strategy for content drafting.",
+        "Checking that pillars connect back to the goal.",
+        "Lining up the calendar structure.",
+    ],
+    content: [
+        "Drafting hooks that feel natural for LinkedIn.",
+        "Writing post bodies with clear proof and value.",
+        "Creating CTA options that do not feel pushy.",
+        "Generating image and creative direction ideas.",
+        "Turning research notes into usable content.",
+    ],
+    content_progress: [
+        "Polishing the next draft.",
+        "Checking the post rhythm and variety.",
+        "Balancing education, proof, and conversion.",
+        "Tightening headlines and opening lines.",
+    ],
+    verification: [
+        "Reviewing brand fit and factual alignment.",
+        "Checking post format and readability.",
+        "Looking for repeated angles or weak CTAs.",
+        "Making sure the campaign is ready to review.",
+    ],
+    publishing: [
+        "Opening X with the saved browser session.",
+        "Checking login state before publishing.",
+        "Preparing the composer and fitting the post.",
+    ],
+    complete: [
+        "Campaign package is ready.",
+    ],
+    error: [
+        "Pausing the live activity feed.",
+    ],
+    default: [
+        "Looking for the next useful signal.",
+        "Organizing the latest findings.",
+        "Keeping the campaign run moving.",
+    ],
 };
 
 function escapeHtml(value) {
@@ -71,14 +144,16 @@ function formatDetails(details) {
 
 function friendlyStatus(data) {
     const labels = {
-        starting: ["Preparing the run", "Setting up the research workspace."],
-        research: ["Searching public sources", "Looking across search, maps, social, and the website."],
-        research_complete: ["Research is ready", "Source coverage and business signals are collected."],
-        strategy: ["Building the strategy", "Turning research into content pillars and channels."],
-        strategy_complete: ["Strategy is ready", "Content pillars and channel direction are drafted."],
-        content: ["Generating content", "Writing posts from the strategy and brand voice."],
-        content_progress: ["Generating content", "A new post draft was created."],
-        verification: ["Checking quality", "Reviewing content for format and factual alignment."],
+        starting: ["Warming up the agent", "Preparing the model, campaign workspace, and research tools."],
+        research: ["Research is underway", "Checking the website, search results, maps, reviews, competitors, and public social profiles."],
+        research_complete: ["Research is ready", "The evidence, source coverage, and business signals are collected."],
+        strategy: ["Strategy is being shaped", "Turning the evidence into content pillars, channel choices, and a posting rhythm."],
+        strategy_complete: ["Strategy is ready", "The campaign direction is drafted and ready for content generation."],
+        content: ["Drafting posts", "Writing hooks, post bodies, proof angles, CTAs, hashtags, and image ideas."],
+        content_progress: ["Drafting posts", "A new content draft is ready; the next one is already moving."],
+        verification: ["Checking the drafts", "Reviewing format, brand voice, factual alignment, and publish readiness."],
+        publishing: ["Publishing to X", "Opening X with your saved browser session and preparing the composer."],
+        published: ["Published to X", "The post has been sent through the persistent browser session."],
         complete: ["Campaign ready", "The research, strategy, and content package are done."],
         error: ["Something needs attention", data.message || "The run hit an error."],
     };
@@ -122,6 +197,55 @@ function previewHtml(preview) {
     `;
 }
 
+function activityPoolForPhase(phase) {
+    return activityMessages[phase] || activityMessages.default;
+}
+
+function activityTime() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function addActivityLine(text) {
+    const panel = ensureThinkingPanel();
+    const list = panel.querySelector("[data-thinking-activity-list]");
+    if (!list || !text) return;
+
+    const item = document.createElement("li");
+    item.className = "thinking-activity-item";
+    item.innerHTML = `<span class="thinking-activity-time">${activityTime()}</span><span>${escapeHtml(text)}</span>`;
+    list.prepend(item);
+
+    while (list.children.length > 5) {
+        list.lastElementChild.remove();
+    }
+    scrollToBottom();
+}
+
+function addNextActivityLine() {
+    const pool = activityPoolForPhase(state.currentPhase);
+    if (state.activityPhase !== state.currentPhase) {
+        state.activityPhase = state.currentPhase;
+        state.activityIndex = 0;
+    }
+    const message = pool[state.activityIndex % pool.length];
+    state.activityIndex += 1;
+    addActivityLine(message);
+}
+
+function startActivityFeed() {
+    if (state.activityTimer) return;
+    addNextActivityLine();
+    state.activityTimer = window.setInterval(addNextActivityLine, 4000);
+}
+
+function stopActivityFeed(finalMessage) {
+    if (state.activityTimer) {
+        window.clearInterval(state.activityTimer);
+        state.activityTimer = null;
+    }
+    if (finalMessage) addActivityLine(finalMessage);
+}
+
 function ensureThinkingPanel() {
     if (state.thinkingPanel) return state.thinkingPanel;
     const node = addMessage("assistant", `
@@ -129,6 +253,13 @@ function ensureThinkingPanel() {
             <div class="thinking-lines">
                 <div class="thinking-line-primary"><span class="pulse-dot"></span><span data-thinking-primary>Preparing the run</span></div>
                 <div class="thinking-line-secondary" data-thinking-secondary>Setting up the research workspace.</div>
+            </div>
+            <div class="thinking-activity">
+                <div class="thinking-activity-head">
+                    <span>Live activity</span>
+                    <span class="thinking-activity-live">Updating every few seconds</span>
+                </div>
+                <ul class="thinking-activity-list" data-thinking-activity-list></ul>
             </div>
             <div data-thinking-preview></div>
             <details class="thinking-box">
@@ -271,10 +402,13 @@ function showConfirmation() {
 
 async function startCampaign() {
     state.step = "running";
+    state.currentPhase = "starting";
+    state.activityIndex = 0;
+    state.activityPhase = "";
     setSuggestions([]);
     input.disabled = true;
     sendButton.disabled = true;
-    addAssistant("Starting the campaign. I’ll stream each search and thinking step here.");
+    addAssistant("Starting the campaign. I’ll keep one live status panel updated while the agent searches, thinks, drafts, and checks the work.");
 
     const formData = new FormData();
     formData.append("name", state.goal || `Campaign for ${new URL(state.businessUrl).hostname}`);
@@ -299,7 +433,10 @@ async function startCampaign() {
 function connectPipeline(campaignId) {
     const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/pipeline/${campaignId}`);
     socket.onopen = () => socket.send(JSON.stringify({ action: "start" }));
-    socket.onerror = () => addAssistant("The live progress connection failed. The backend may still be running.");
+    socket.onerror = () => {
+        stopActivityFeed("Live connection dropped. The backend may still be running.");
+        addAssistant("The live progress connection failed. The backend may still be running.");
+    };
     socket.onmessage = async (event) => {
         const data = JSON.parse(event.data);
         setProgress(data.progress || 0);
@@ -318,6 +455,13 @@ function renderProgressEvent(data) {
     const historyNode = panel.querySelector("[data-thinking-history]");
     const previewNode = panel.querySelector("[data-thinking-preview]");
     const card = panel.querySelector(".thinking-card");
+    const previousPhase = state.currentPhase;
+
+    state.currentPhase = data.phase || state.currentPhase || "default";
+    if (data.phase && data.phase !== previousPhase && state.activityTimer) {
+        state.activityPhase = "";
+        addNextActivityLine();
+    }
 
     if (data.preview) {
         state.latestPreview = data.preview;
@@ -338,16 +482,22 @@ function renderProgressEvent(data) {
         .map((item) => `[${item.time}] ${item.phase || "run"} (${item.progress || 0}%): ${item.message || ""}\n${formatDetails(item.details)}`)
         .join("\n\n");
 
+    if (data.event_type !== "complete" && data.event_type !== "error") {
+        startActivityFeed();
+    }
+
     if (data.phase === "complete" || data.event_type === "complete") {
         card.classList.remove("is-running");
         primaryNode.textContent = "Campaign ready";
         secondaryNode.textContent = "Results are below. You can open the full workspace or calendar.";
+        stopActivityFeed("Campaign package is ready to review.");
     }
     if (data.event_type === "error") {
         card.classList.remove("is-running");
         primaryNode.textContent = "The run needs attention";
         secondaryNode.textContent = data.message || "Something went wrong.";
         panel.querySelector("details")?.setAttribute("open", "");
+        stopActivityFeed("Stopped while the run needs attention.");
     }
     scrollToBottom();
 }
