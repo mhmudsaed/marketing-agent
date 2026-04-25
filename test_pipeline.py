@@ -10,7 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from models.research import (
     ResearchResult, BusinessProfile, BuyerPersona, 
-    BrandVoice, Competitor, ResearchEvidence
+    BrandVoice, Competitor, ResearchEvidence, BusinessLocation,
+    SocialProfile, ReviewsSummary, OSINTSource, SearchToolCoverage
 )
 from models.strategy import StrategyResult, ContentPillar, ChannelStrategy, CalendarItem
 from models.content import GeneratedContent, ContentPackage
@@ -52,6 +53,11 @@ def test_models():
         audience=[persona],
         brand_voice=brand,
         evidence=ResearchEvidence(source_urls=["https://test.com"]),
+        locations=[BusinessLocation(name="Test Corp", address="123 Main St", rating=4.8, reviews=42)],
+        social_profiles=[SocialProfile(platform="LinkedIn", url="https://linkedin.com/company/test")],
+        reviews_summary=ReviewsSummary(average_rating=4.8, total_reviews=42, themes=["service"]),
+        osint_sources=[OSINTSource(tool="serpapi", source_type="google_maps", title="Test Corp", url="https://test.com", score=0.9)],
+        search_tool_coverage=SearchToolCoverage(serpapi=2, tavily=3, firecrawl=1, website_pages=1, total_sources=7),
         confidence_score=0.85,
         summary="Test research"
     )
@@ -98,6 +104,7 @@ def test_models():
     )
     
     print(f"  ✓ Research model: {research.business.name}")
+    print(f"  ✓ OSINT coverage: {research.search_tool_coverage.total_sources} sources")
     print(f"  ✓ Strategy model: {len(strategy.calendar)} calendar items")
     print(f"  ✓ Content model: {package.total_posts} posts")
     print(f"  ✓ Verification model: {report.total_passed}/{report.total_checked} passed")
@@ -137,6 +144,54 @@ def test_pipeline_structure():
     print(f"  ✓ Output dir: {state.output_dir}")
     print("  Pipeline structure OK!")
 
+def test_campaign_metadata_model():
+    """Test chat onboarding metadata is available on Campaign."""
+    print("\nTesting campaign metadata model...")
+    from web.database import Campaign
+
+    campaign = Campaign(
+        name="Chat Run",
+        business_url="https://example.com",
+        model_mode="offline",
+        model_name="qwen-3.6",
+        user_goal="Build LinkedIn content",
+        extra_context="Focus on founders",
+    )
+    assert campaign.model_mode == "offline"
+    assert campaign.model_name == "qwen-3.6"
+    assert "LinkedIn" in campaign.user_goal
+    print("  Campaign metadata OK!")
+
+def test_serpapi_normalization():
+    """Test SerpApi response normalization without live API calls."""
+    print("\nTesting SerpApi normalization...")
+    from clients.serpapi import SerpApiClient
+
+    client = SerpApiClient(api_key="test", max_results=5)
+    organic = client.normalize_organic_results({
+        "organic_results": [
+            {"title": "Instagram Profile", "link": "https://instagram.com/test", "snippet": "Public profile", "position": 1}
+        ]
+    }, source_type="social_search")
+    maps = client.normalize_maps_results({
+        "local_results": [
+            {
+                "title": "Test Corp",
+                "website": "https://test.com",
+                "rating": 4.7,
+                "reviews": 100,
+                "address": "123 Main St",
+                "gps_coordinates": {"latitude": 1.0, "longitude": 2.0},
+            }
+        ]
+    })
+
+    assert organic[0]["tool"] == "serpapi"
+    assert organic[0]["source_type"] == "social_search"
+    assert maps[0]["source_type"] == "google_maps"
+    assert maps[0]["rating"] == 4.7
+    print("  SerpApi normalization OK!")
+
 def main():
     print("=" * 60)
     print("Marketing Content Pipeline Agent - Validation Tests")
@@ -145,6 +200,8 @@ def main():
     test_models()
     test_validators()
     test_pipeline_structure()
+    test_campaign_metadata_model()
+    test_serpapi_normalization()
     
     print("\n" + "=" * 60)
     print("✅ All tests passed! Agent is structurally sound.")

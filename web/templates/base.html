@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Market Agent{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/app.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <header class="site-header">
+        <a href="/" class="wordmark" aria-label="Market Agent home">
+            <span class="wordmark-mark">ma</span>
+            <span>Market Agent</span>
+        </a>
+        <nav class="header-nav">
+            <a href="/">Chat</a>
+            <a href="/calendar">Calendar</a>
+            <a href="/settings">Settings</a>
+        </nav>
+        <div class="health-pills">
+            <span class="health-pill {{ 'is-ok' if api_status and api_status.llm else 'is-warn' }}">LLM</span>
+            <span class="health-pill {{ 'is-ok' if api_status and api_status.serpapi else 'is-warn' }}">SerpApi</span>
+            <span class="health-pill {{ 'is-ok' if api_status and api_status.tavily else 'is-warn' }}">Tavily</span>
+        </div>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

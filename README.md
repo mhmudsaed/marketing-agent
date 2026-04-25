@@ -26,8 +26,9 @@ Business URL
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 1: Research & Discovery                                   │
-│ • Website scraping + search intelligence                        │
+│ PHASE 1: Deep OSINT Research & Discovery                        │
+│ • Website scraping + SerpApi + Tavily + Firecrawl               │
+│ • Google Maps/local, reviews, social footprint discovery        │
 │ • Business profiling, audience personas, brand voice extraction │
 │ • Competitor analysis                                           │
 └─────────────────────────────────────────────────────────────────┘
@@ -159,7 +160,8 @@ python main.py --url https://example.com --model anthropic/claude-3-opus
 
 | Service | Purpose | Get Key At |
 |---------|---------|------------|
-| **OpenRouter** | LLM access (Claude, GPT, etc.) | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| **LLM Backend** | OpenAI-compatible LLM access (llama.cpp, OpenRouter, vLLM) | Local or provider |
+| **SerpApi** | Google Search, Google Maps, social/review discovery | [serpapi.com](https://serpapi.com) |
 | **Tavily** | AI-optimized web search | [tavily.com](https://tavily.com) |
 | **Firecrawl** | Advanced web scraping (optional) | [firecrawl.dev](https://firecrawl.dev) |
 
@@ -167,7 +169,8 @@ python main.py --url https://example.com --model anthropic/claude-3-opus
 
 | Service | Estimated Cost | Notes |
 |---------|---------------|-------|
-| OpenRouter | $0.10 - $0.50 | Depends on model and content volume |
+| LLM Backend | Local or provider cost | llama.cpp can run locally; provider cost depends on model |
+| SerpApi | Depends on plan | Used for Google Search and Maps OSINT |
 | Tavily | Free tier: 1,000/mo | Pro: $0.025/search |
 | Firecrawl | Free tier available | Pro plans for scale |
 
@@ -178,9 +181,19 @@ python main.py --url https://example.com --model anthropic/claude-3-opus
 All configuration is via environment variables (see `.env.example`):
 
 ```env
-# OpenRouter (REQUIRED)
+# LLM (OpenAI-compatible; llama.cpp default)
+LLM_BASE_URL=http://localhost:8080/v1
+LLM_API_KEY=
+LLM_MODEL=qwen-3.6
+LLM_DISABLE_THINKING=true
+
+# OpenRouter compatibility
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+
+# SerpApi (REQUIRED for deep OSINT)
+SERPAPI_KEY=...
+SERPAPI_MAX_RESULTS=10
 
 # Tavily (REQUIRED)
 TAVILY_API_KEY=tvly-...

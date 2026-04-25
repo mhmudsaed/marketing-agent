@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from web.database import init_db, get_db, SessionLocal, Campaign, Research, Strategy, Post, BrandVoiceTemplate
 from core.pipeline import MarketingPipeline
+from clients.openrouter import OpenRouterClient
 from config.settings import settings
 from utils.logger import logger
 
@@ -81,8 +82,68 @@ def campaign_to_dict(c):
         "id": c.id,
         "name": c.name,
         "business_url": c.business_url,
+        "model_mode": c.model_mode,
+        "model_name": c.model_name,
+        "user_goal": c.user_goal,
         "status": c.status,
     }
+
+def api_status():
+    errors = settings.validate()
+    return {
+        "configured": not errors,
+        "errors": errors,
+        "llm": bool(settings.LLM_BASE_URL and (settings.LLM_API_KEY or "localhost" in settings.LLM_BASE_URL or "127.0.0.1" in settings.LLM_BASE_URL)),
+        "tavily": bool(settings.TAVILY_API_KEY),
+        "serpapi": bool(settings.SERPAPI_KEY),
+        "firecrawl": bool(settings.FIRECRAWL_API_KEY),
+    }
+
+def available_models():
+    models = [
+        {
+            "mode": "offline",
+            "label": f"Local: {settings.LLM_MODEL}",
+            "value": settings.LLM_MODEL,
+            "description": "Runs through your local OpenAI-compatible llama.cpp endpoint.",
+        },
+        {
+            "mode": "online",
+            "label": "GPT-4o mini",
+            "value": "openai/gpt-4o-mini",
+            "description": "Fast online fallback if your provider is configured.",
+        },
+        {
+            "mode": "online",
+            "label": "Gemini Flash",
+            "value": "google/gemini-2.0-flash-001",
+            "description": "Online lightweight model option.",
+        },
+    ]
+    seen = set()
+    unique = []
+    for model in models:
+        key = (model["mode"], model["value"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(model)
+    return unique
+
+def chat_context(request: Request, **extra):
+    context = {
+        "current_path": request.url.path,
+        "api_status": api_status(),
+        "models": available_models(),
+        "default_model": settings.LLM_MODEL,
+        "suggestions": [
+            "Research my startup",
+            "Find competitors",
+            "Build LinkedIn content",
+            "Analyze a local business",
+        ],
+    }
+    context.update(extra)
+    return context
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE ROUTES
@@ -97,21 +158,15 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "published": sum(1 for c in campaigns if c.status == "published"),
         "in_progress": sum(1 for c in campaigns if c.status not in ["ready", "published", "draft"])
     }
-    return templates.TemplateResponse(request, "dashboard.html", {
-        "campaigns": campaigns,
-        "stats": stats
-    })
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        chat_context(request, campaigns=campaigns, stats=stats),
+    )
 
 @app.get("/campaign/new", response_class=HTMLResponse)
 async def new_campaign_page(request: Request):
-    return templates.TemplateResponse(request, "new_campaign.html", {
-        "models": [
-            "openai/gpt-4o-mini",
-            "anthropic/claude-3.5-sonnet",
-            "openai/gpt-4o",
-            "google/gemini-2.0-flash-001"
-        ]
-    })
+    return templates.TemplateResponse(request, "dashboard.html", chat_context(request))
 
 @app.get("/campaign/{campaign_id}", response_class=HTMLResponse)
 async def campaign_detail(request: Request, campaign_id: int, db: Session = Depends(get_db)):
@@ -121,29 +176,32 @@ async def campaign_detail(request: Request, campaign_id: int, db: Session = Depe
     
     posts = db.query(Post).filter(Post.campaign_id == campaign_id).all()
     
-    return templates.TemplateResponse(request, "campaign_detail.html", {
-        "campaign": campaign,
-        "posts": [post_to_dict(p) for p in posts],
-        "research": campaign.research,
-        "strategy": campaign.strategy
-    })
+    return templates.TemplateResponse(request, "campaign_detail.html", chat_context(
+        request,
+        campaign=campaign,
+        posts=[post_to_dict(p) for p in posts],
+        research=campaign.research,
+        strategy=campaign.strategy,
+    ))
 
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_view(request: Request, db: Session = Depends(get_db)):
     posts = db.query(Post).filter(Post.status.in_(["approved", "scheduled", "published"])).all()
     campaigns = db.query(Campaign).all()
-    return templates.TemplateResponse(request, "calendar.html", {
-        "posts": [post_to_dict(p) for p in posts],
-        "campaigns": [campaign_to_dict(c) for c in campaigns]
-    })
+    return templates.TemplateResponse(request, "calendar.html", chat_context(
+        request,
+        posts=[post_to_dict(p) for p in posts],
+        campaigns=[campaign_to_dict(c) for c in campaigns],
+    ))
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, db: Session = Depends(get_db)):
     brand_voices = db.query(BrandVoiceTemplate).all()
-    return templates.TemplateResponse(request, "settings.html", {
-        "brand_voices": brand_voices,
-        "api_configured": bool(settings.OPENROUTER_API_KEY and settings.TAVILY_API_KEY)
-    })
+    return templates.TemplateResponse(request, "settings.html", chat_context(
+        request,
+        brand_voices=brand_voices,
+        api_configured=api_status()["configured"],
+    ))
 
 # ═══════════════════════════════════════════════════════════════
 # API ENDPOINTS
@@ -153,14 +211,22 @@ async def settings_page(request: Request, db: Session = Depends(get_db)):
 async def create_campaign(
     name: str = Form(...),
     url: str = Form(...),
-    model: str = Form("openai/gpt-4o-mini"),
+    model: str = Form(""),
+    model_mode: str = Form("offline"),
+    user_goal: str = Form(""),
+    extra_context: str = Form(""),
     calendar_days: int = Form(14),
     posts_per_week: int = Form(3),
     db: Session = Depends(get_db)
 ):
+    selected_model = model or settings.LLM_MODEL
     campaign = Campaign(
         name=name,
         business_url=url,
+        model_mode=model_mode,
+        model_name=selected_model,
+        user_goal=user_goal,
+        extra_context=extra_context,
         status="draft",
         progress=0
     )
@@ -177,6 +243,9 @@ async def list_campaigns(db: Session = Depends(get_db)):
             "id": c.id,
             "name": c.name,
             "business_url": c.business_url,
+            "model_mode": c.model_mode,
+            "model_name": c.model_name,
+            "user_goal": c.user_goal,
             "status": c.status,
             "progress": c.progress,
             "created_at": c.created_at.isoformat() if c.created_at else None,
@@ -195,6 +264,10 @@ async def get_campaign(campaign_id: int, db: Session = Depends(get_db)):
         "id": campaign.id,
         "name": campaign.name,
         "business_url": campaign.business_url,
+        "model_mode": campaign.model_mode,
+        "model_name": campaign.model_name,
+        "user_goal": campaign.user_goal,
+        "extra_context": campaign.extra_context,
         "status": campaign.status,
         "progress": campaign.progress,
         "created_at": campaign.created_at.isoformat() if campaign.created_at else None,
@@ -204,6 +277,11 @@ async def get_campaign(campaign_id: int, db: Session = Depends(get_db)):
             "industry": campaign.research.industry if campaign.research else None,
             "confidence_score": campaign.research.confidence_score if campaign.research else 0,
             "summary": campaign.research.summary if campaign.research else None,
+            "locations": campaign.research.locations if campaign.research else [],
+            "social_profiles": campaign.research.social_profiles if campaign.research else [],
+            "reviews_summary": campaign.research.reviews_summary if campaign.research else {},
+            "search_tool_coverage": campaign.research.search_tool_coverage if campaign.research else {},
+            "research_depth": campaign.research.research_depth if campaign.research else "standard",
         } if campaign.research else None,
         "strategy": {
             "pillars": campaign.strategy.pillars if campaign.strategy else [],
@@ -245,7 +323,14 @@ async def get_research(campaign_id: int, db: Session = Depends(get_db)):
         "competitors": research.competitors,
         "confidence_score": research.confidence_score,
         "summary": research.summary,
-        "evidence_urls": research.evidence_urls
+        "evidence_urls": research.evidence_urls,
+        "locations": research.locations,
+        "social_profiles": research.social_profiles,
+        "reviews_summary": research.reviews_summary,
+        "osint_sources": research.osint_sources,
+        "search_tool_coverage": research.search_tool_coverage,
+        "competitor_evidence": research.competitor_evidence,
+        "research_depth": research.research_depth,
     }
 
 @app.get("/api/campaigns/{campaign_id}/posts")
@@ -381,23 +466,40 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
     
     await manager.send_progress(campaign_id, {
         "phase": "starting",
+        "event_type": "thinking",
         "progress": 0,
-        "message": "Starting pipeline..."
+        "message": "Starting pipeline...",
+        "details": {"campaign_id": campaign_id}
     })
     
     try:
-        async with MarketingPipeline() as pipeline:
+        selected_model = campaign.model_name or settings.LLM_MODEL
+        user_context = "\n".join(
+            part for part in [
+                f"User goal: {campaign.user_goal}" if campaign.user_goal else "",
+                campaign.extra_context or "",
+            ]
+            if part
+        )
+        async with MarketingPipeline(llm=OpenRouterClient(model=selected_model)) as pipeline:
             # Phase 1: Research
             campaign.status = "researching"
             campaign.progress = 10
             db.commit()
             await manager.send_progress(campaign_id, {
                 "phase": "research",
+                "event_type": "searching",
                 "progress": 10,
-                "message": "Researching business..."
+                "message": "Searching with SerpApi, Tavily, and Firecrawl...",
+                "details": {
+                    "model_mode": campaign.model_mode,
+                    "model": selected_model,
+                    "tools": ["SerpApi", "Tavily", "Firecrawl"],
+                    "extra_context": bool(user_context),
+                },
             })
             
-            research_result = await pipeline.run_research_only(campaign.business_url)
+            research_result = await pipeline.run_research_only(campaign.business_url, extra_context=user_context)
             
             research = Research(
                 campaign_id=campaign_id,
@@ -419,18 +521,29 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 content_examples=research_result.content_examples,
                 confidence_score=research_result.confidence_score,
                 summary=research_result.summary,
-                evidence_urls=research_result.evidence.source_urls
+                evidence_urls=research_result.evidence.source_urls,
+                locations=[l.model_dump() for l in research_result.locations],
+                social_profiles=[p.model_dump() for p in research_result.social_profiles],
+                reviews_summary=research_result.reviews_summary.model_dump(),
+                osint_sources=[s.model_dump() for s in research_result.osint_sources],
+                search_tool_coverage=research_result.search_tool_coverage.model_dump(),
+                competitor_evidence=[s.model_dump() for s in research_result.competitor_evidence],
+                research_depth=research_result.research_depth
             )
             db.add(research)
             db.commit()
             
             await manager.send_progress(campaign_id, {
                 "phase": "research_complete",
+                "event_type": "phase_complete",
                 "progress": 25,
                 "message": f"Research complete: {research_result.business.name}",
                 "data": {
                     "business_name": research_result.business.name,
-                    "confidence": research_result.confidence_score
+                    "confidence": research_result.confidence_score,
+                    "coverage": research_result.search_tool_coverage.model_dump(),
+                    "social_profiles": len(research_result.social_profiles),
+                    "locations": len(research_result.locations),
                 }
             })
             
@@ -440,8 +553,13 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
             db.commit()
             await manager.send_progress(campaign_id, {
                 "phase": "strategy",
+                "event_type": "thinking",
                 "progress": 30,
-                "message": "Building content strategy..."
+                "message": "Synthesizing strategy with the selected model...",
+                "details": {
+                    "model": selected_model,
+                    "inputs": ["research summary", "audience", "brand voice", "source coverage"],
+                },
             })
             
             strategy_result = await pipeline.run_strategy_only(research_result)
@@ -458,6 +576,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
             
             await manager.send_progress(campaign_id, {
                 "phase": "strategy_complete",
+                "event_type": "phase_complete",
                 "progress": 40,
                 "message": f"Strategy ready: {len(strategy_result.pillars)} pillars, {len(strategy_result.channels)} channels"
             })
@@ -468,8 +587,13 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
             db.commit()
             await manager.send_progress(campaign_id, {
                 "phase": "content",
+                "event_type": "thinking",
                 "progress": 45,
-                "message": f"Generating {len(strategy_result.calendar)} posts..."
+                "message": f"Generating {len(strategy_result.calendar)} posts...",
+                "details": {
+                    "model": selected_model,
+                    "calendar_items": len(strategy_result.calendar),
+                },
             })
             
             content_result = await pipeline.run_content_only(research_result, strategy_result)
@@ -505,9 +629,15 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
                 
                 await manager.send_progress(campaign_id, {
                     "phase": "content_progress",
+                    "event_type": "tool_result",
                     "progress": progress,
                     "message": f"Generated post {idx + 1}/{len(content_result.contents)}: {content.topic}",
-                    "post_index": idx
+                    "post_index": idx,
+                    "details": {
+                        "channel": content.channel,
+                        "word_count": content.word_count,
+                        "char_count": content.char_count,
+                    },
                 })
             
             # Phase 4: Verification
@@ -516,8 +646,10 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
             db.commit()
             await manager.send_progress(campaign_id, {
                 "phase": "verification",
+                "event_type": "thinking",
                 "progress": 80,
-                "message": "Verifying content quality..."
+                "message": "Verifying content quality...",
+                "details": {"checks": ["brand alignment", "facts", "format", "quality"]},
             })
             
             posts = db.query(Post).filter(Post.campaign_id == campaign_id).all()
@@ -533,6 +665,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
             
             await manager.send_progress(campaign_id, {
                 "phase": "complete",
+                "event_type": "complete",
                 "progress": 100,
                 "message": "Campaign ready! All posts generated and verified.",
                 "campaign_id": campaign_id
@@ -544,6 +677,7 @@ async def run_pipeline_with_progress(campaign_id: int, db: Session, manager: Pip
         db.commit()
         await manager.send_progress(campaign_id, {
             "phase": "error",
+            "event_type": "error",
             "progress": 0,
             "message": f"Error: {str(e)}"
         })
@@ -553,7 +687,8 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "2.0.0",
-        "api_configured": bool(settings.OPENROUTER_API_KEY and settings.TAVILY_API_KEY)
+        "api_configured": api_status()["configured"],
+        "api_status": api_status(),
     }
 
 if __name__ == "__main__":

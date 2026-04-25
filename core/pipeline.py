@@ -4,6 +4,7 @@ from typing import Optional
 from clients.openrouter import OpenRouterClient
 from clients.tavily import TavilyClient
 from clients.scraper import WebScraper
+from clients.serpapi import SerpApiClient
 from models.research import ResearchResult
 from models.strategy import StrategyResult
 from models.content import ContentPackage
@@ -28,23 +29,25 @@ class MarketingPipeline:
         self,
         llm: Optional[OpenRouterClient] = None,
         search: Optional[TavilyClient] = None,
+        serpapi: Optional[SerpApiClient] = None,
         scraper: Optional[WebScraper] = None,
         state_manager: Optional[PipelineStateManager] = None
     ):
         self.llm = llm or OpenRouterClient()
         self.search = search or TavilyClient()
+        self.serpapi = serpapi or SerpApiClient()
         self.scraper = scraper or WebScraper()
         self.state = state_manager or PipelineStateManager()
         
         # Phase engines
-        self.research_engine = ResearchEngine(self.llm, self.search, self.scraper)
+        self.research_engine = ResearchEngine(self.llm, self.search, self.scraper, self.serpapi)
         self.strategy_engine = StrategyEngine(self.llm)
         self.content_engine = ContentEngine(self.llm)
         self.verification_engine = VerificationEngine(self.llm)
         
         logger.info("🚀 MarketingPipeline initialized")
     
-    async def run(self, business_url: str) -> dict:
+    async def run(self, business_url: str, extra_context: str = "") -> dict:
         """
         Execute the full pipeline.
         
@@ -62,7 +65,7 @@ class MarketingPipeline:
             logger.info("═" * 60)
             logger.info("PHASE 1: RESEARCH & DISCOVERY")
             logger.info("═" * 60)
-            research = await self.research_engine.run(business_url)
+            research = await self.research_engine.run(business_url, extra_context=extra_context)
             self.state.save_research(research)
             self.state.update(status="research_complete", business_name=research.business.name)
             
@@ -117,9 +120,9 @@ class MarketingPipeline:
             self.state.save_summary()
             raise
     
-    async def run_research_only(self, business_url: str) -> ResearchResult:
+    async def run_research_only(self, business_url: str, extra_context: str = "") -> ResearchResult:
         """Run only the research phase."""
-        return await self.research_engine.run(business_url)
+        return await self.research_engine.run(business_url, extra_context=extra_context)
     
     async def run_strategy_only(self, research: ResearchResult) -> StrategyResult:
         """Run only the strategy phase."""
@@ -146,6 +149,7 @@ class MarketingPipeline:
         """Cleanup resources."""
         await self.llm.close()
         await self.search.close()
+        await self.serpapi.close()
         await self.scraper.close()
     
     async def __aenter__(self):

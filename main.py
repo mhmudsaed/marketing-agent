@@ -104,7 +104,7 @@ async def main():
 Examples:
   python main.py --url https://example.com
   python main.py --url https://example.com --research-only
-  python main.py --url https://example.com --model anthropic/claude-3-opus
+  python main.py --url https://example.com --model qwen-3.6
         """
     )
     
@@ -115,8 +115,8 @@ Examples:
     )
     parser.add_argument(
         "--model", "-m",
-        default=settings.OPENROUTER_MODEL,
-        help=f"OpenRouter model to use (default: {settings.OPENROUTER_MODEL})"
+        default=settings.LLM_MODEL,
+        help=f"LLM model to use (default: {settings.LLM_MODEL})"
     )
     parser.add_argument(
         "--research-only",
@@ -138,6 +138,7 @@ Examples:
     
     # Update settings from args
     if args.model:
+        settings.LLM_MODEL = args.model
         settings.OPENROUTER_MODEL = args.model
     if args.output_dir:
         settings.OUTPUT_DIR = Path(args.output_dir)
@@ -149,7 +150,7 @@ Examples:
     print_banner()
     
     console.print(f"[bold]Target:[/bold] {args.url}")
-    console.print(f"[bold]Model:[/bold] {settings.OPENROUTER_MODEL}")
+    console.print(f"[bold]Model:[/bold] {settings.LLM_MODEL}")
     console.print(f"[bold]Output:[/bold] {settings.OUTPUT_DIR}")
     console.print()
     

@@ -1,251 +1,77 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marketing Content Pipeline</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            min-height: 100vh;
-        }
-        .layout { display: flex; min-height: 100vh; }
-        .sidebar {
-            width: 240px;
-            background: #1e293b;
-            border-right: 1px solid #334155;
-            padding: 24px 16px;
-            flex-shrink: 0;
-        }
-        .sidebar h1 {
-            font-size: 18px;
-            margin-bottom: 32px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #334155;
-        }
-        .sidebar h1 span {
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 8px;
-            color: #94a3b8;
-            text-decoration: none;
-            margin-bottom: 4px;
-            font-size: 14px;
-        }
-        .nav-link:hover { background: #334155; color: #e2e8f0; }
-        .nav-link.active { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
-        .main { flex: 1; overflow: auto; }
-        .header {
-            background: #1e293b;
-            border-bottom: 1px solid #334155;
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .btn {
-            background: #6366f1;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-        }
-        .btn:hover { background: #5558e0; }
-        .content { padding: 24px; }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            padding: 24px;
-        }
-        .stat-card .label { color: #94a3b8; font-size: 13px; margin-bottom: 8px; }
-        .stat-card .value { font-size: 32px; font-weight: 700; }
-        .stat-card .value.green { color: #4ade80; }
-        .stat-card .value.blue { color: #60a5fa; }
-        .stat-card .value.yellow { color: #facc15; }
-        .card {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            padding: 24px;
-        }
-        .card h3 { margin-bottom: 16px; font-size: 16px; }
-        .empty-state {
-            text-align: center;
-            padding: 64px 24px;
-        }
-        .empty-state .icon {
-            width: 64px;
-            height: 64px;
-            background: rgba(99, 102, 241, 0.15);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            font-size: 28px;
-        }
-        .empty-state h4 { margin-bottom: 8px; }
-        .empty-state p { color: #94a3b8; margin-bottom: 24px; }
-        .campaign-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px;
-            background: #0f172a;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            border: 1px solid transparent;
-        }
-        .campaign-item:hover { border-color: #6366f1; }
-        .campaign-item .icon-box {
-            width: 40px;
-            height: 40px;
-            background: rgba(99, 102, 241, 0.15);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-        .campaign-info h4 { font-size: 14px; margin-bottom: 4px; }
-        .campaign-info p { font-size: 12px; color: #94a3b8; }
-        .badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .badge.draft { background: #fef3c7; color: #92400e; }
-        .badge.ready { background: #d1fae5; color: #065f46; }
-        .badge.published { background: #dbeafe; color: #1e40af; }
-        .badge.researching { background: #fce7f3; color: #9d174d; }
-        .progress-bar {
-            width: 120px;
-            height: 4px;
-            background: #334155;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6);
-            transition: width 0.5s;
-        }
-        @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-    </style>
-</head>
-<body>
-    <div class="layout">
-        <aside class="sidebar">
-            <h1><span>Content Agent</span></h1>
-            <nav>
-                <a href="/" class="nav-link active">
-                    <span>🏠</span> Dashboard
-                </a>
-                <a href="/campaign/new" class="nav-link">
-                    <span>➕</span> New Campaign
-                </a>
-                <a href="/calendar" class="nav-link">
-                    <span>📅</span> Calendar
-                </a>
-                <a href="/settings" class="nav-link">
-                    <span>⚙️</span> Settings
-                </a>
-            </nav>
-        </aside>
+{% extends "base.html" %}
 
-        <main class="main">
-            <header class="header">
-                <h2>Dashboard</h2>
-                <a href="/campaign/new" class="btn">+ New Campaign</a>
-            </header>
+{% block title %}Market Agent - Research Chat{% endblock %}
 
-            <div class="content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="label">Total Campaigns</div>
-                        <div class="value">{{ stats.total }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">Ready to Publish</div>
-                        <div class="value green">{{ stats.ready }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">Published</div>
-                        <div class="value blue">{{ stats.published }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">In Progress</div>
-                        <div class="value yellow">{{ stats.in_progress }}</div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>Your Campaigns</h3>
-                    
-                    {% if campaigns %}
-                        {% for campaign in campaigns %}
-                        <div class="campaign-item" onclick="window.location='/campaign/{{ campaign.id }}'">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div class="icon-box">🏢</div>
-                                <div class="campaign-info">
-                                    <h4>{{ campaign.name }}</h4>
-                                    <p>{{ campaign.business_url }} • {{ campaign.post_count }} posts</p>
-                                    <div style="margin-top: 6px;">
-                                        <span class="badge {{ campaign.status }}">{{ campaign.status }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                {% if campaign.progress > 0 and campaign.progress < 100 %}
-                                <div class="progress-bar" style="margin-bottom: 6px;">
-                                    <div class="progress-fill" style="width: {{ campaign.progress }}%"></div>
-                                </div>
-                                {% endif %}
-                                <p style="font-size: 11px; color: #64748b;">
-                                    {{ campaign.created_at.strftime('%b %d, %Y') if campaign.created_at else 'Just now' }}
-                                </p>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                    <div class="empty-state">
-                        <div class="icon">🚀</div>
-                        <h4>No campaigns yet</h4>
-                        <p>Create your first marketing campaign in minutes</p>
-                        <a href="/campaign/new" class="btn">Create Campaign</a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </main>
+{% block content %}
+<section class="chat-hero">
+    <div class="hero-copy">
+        <p class="microcopy">Local-first marketing intelligence</p>
+        <h1>Tell me the business. I’ll do the research.</h1>
+        <p class="hero-subtitle">
+            A calm chatbot workspace for deep OSINT, local LLM synthesis, content strategy,
+            and ready-to-edit campaign posts.
+        </p>
     </div>
-</body>
-</html>
+    <aside class="recent-card">
+        <div class="recent-card-head">
+            <span>Recent campaigns</span>
+            <strong>{{ stats.total if stats else 0 }}</strong>
+        </div>
+        {% if campaigns %}
+        <div class="recent-list">
+            {% for campaign in campaigns[:4] %}
+            <a href="/campaign/{{ campaign.id }}" class="recent-item">
+                <span>{{ campaign.name }}</span>
+                <small>{{ campaign.status }} · {{ campaign.progress or 0 }}%</small>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-note">No campaigns yet. Start with a link and a goal.</p>
+        {% endif %}
+    </aside>
+</section>
+
+<section
+    id="chat-app"
+    class="chat-app"
+    data-models='{{ models | tojson }}'
+    data-default-model="{{ default_model }}"
+    data-suggestions='{{ suggestions | tojson }}'
+>
+    <div class="chat-rail">
+        <div class="rail-card">
+            <span class="rail-label">Mode</span>
+            <strong id="rail-mode">Not chosen</strong>
+        </div>
+        <div class="rail-card">
+            <span class="rail-label">Model</span>
+            <strong id="rail-model">{{ default_model }}</strong>
+        </div>
+        <div class="rail-card">
+            <span class="rail-label">Business</span>
+            <strong id="rail-business">Waiting for link</strong>
+        </div>
+        <div class="rail-card rail-progress">
+            <span class="rail-label">Run progress</span>
+            <strong id="rail-progress-label">0%</strong>
+            <div class="progress-track"><span id="rail-progress-bar"></span></div>
+        </div>
+    </div>
+
+    <div class="chat-panel">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="suggestion-row" class="suggestion-row"></div>
+        <form id="chat-form" class="composer">
+            <textarea id="chat-input" rows="1" placeholder="Type here..." autocomplete="off"></textarea>
+            <button id="send-button" type="submit" aria-label="Send message">
+                <i class="fas fa-arrow-up"></i>
+            </button>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/chat.js"></script>
+{% endblock %}

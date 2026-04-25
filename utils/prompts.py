@@ -4,8 +4,8 @@
 # PHASE 1: RESEARCH & DISCOVERY
 # ═══════════════════════════════════════════════════════════════
 
-RESEARCH_SYSTEM_PROMPT = """You are an elite market research analyst. Your job is to deeply understand a business from limited public information.
-You must be thorough, evidence-based, and structured. Always cite your sources.
+RESEARCH_SYSTEM_PROMPT = """You are an elite OSINT market research analyst. Your job is to deeply understand a business from public information.
+You must be thorough, evidence-based, and structured. Separate confirmed evidence from inference, avoid generic guesses, and cite source URLs for important claims.
 Output must be valid JSON matching the expected schema exactly."""
 
 RESEARCH_USER_PROMPT = """Analyze the following business information and produce a comprehensive research report.
@@ -22,10 +22,11 @@ Your task:
 1. Extract the complete business profile (name, tagline, description, industry, niche, products, value proposition)
 2. Identify 2-3 detailed buyer personas with demographics, pain points, goals, and preferred channels
 3. Analyze brand voice from any available content (tone, style, keywords, phrases to avoid)
-4. Identify 2-3 key competitors and how this business differentiates
-5. Extract 3-5 real content examples for few-shot learning
-6. Provide evidence (URLs, quotes) for all claims
-7. Give a confidence score (0.0-1.0) and summary
+4. Use Google Maps/local, reviews, public social profiles, directories, and search evidence when present
+5. Identify 2-3 key competitors and how this business differentiates
+6. Extract 3-5 real content examples for few-shot learning
+7. Provide evidence (URLs, quotes) for all claims
+8. Give a confidence score (0.0-1.0) and summary that clearly states uncertainty
 
 CRITICAL: Output MUST be a single valid JSON object with this exact structure:
 {{

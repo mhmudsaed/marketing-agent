@@ -131,7 +131,7 @@ class ContentEngine:
             char_count=ContentValidator.count_chars(content_text),
             reading_time=self._estimate_reading_time(content_text),
             variants=variants,
-            model_used=settings.OPENROUTER_MODEL,
+            model_used=self.llm.model,
             generation_time_ms=elapsed
         )
     

@@ -1,6 +1,6 @@
 """Database models and session management."""
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, JSON
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, JSON, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from config.settings import settings
@@ -13,6 +13,10 @@ class Campaign(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     business_url = Column(String(500), nullable=False)
+    model_mode = Column(String(50), default="offline")
+    model_name = Column(String(255))
+    user_goal = Column(Text)
+    extra_context = Column(Text)
     status = Column(String(50), default="draft")  # draft, researching, strategizing, generating, verifying, ready, published
     progress = Column(Integer, default=0)  # 0-100
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -51,6 +55,13 @@ class Research(Base):
     confidence_score = Column(Float, default=0.0)
     summary = Column(Text)
     evidence_urls = Column(JSON, default=list)
+    locations = Column(JSON, default=list)
+    social_profiles = Column(JSON, default=list)
+    reviews_summary = Column(JSON, default=dict)
+    osint_sources = Column(JSON, default=list)
+    search_tool_coverage = Column(JSON, default=dict)
+    competitor_evidence = Column(JSON, default=list)
+    research_depth = Column(String(50), default="standard")
     
     campaign = relationship("Campaign", back_populates="research")
 
@@ -149,6 +160,45 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate_campaign_columns()
+    _migrate_research_columns()
+
+def _migrate_campaign_columns():
+    """Add chat-onboarding metadata columns for existing SQLite databases."""
+    inspector = inspect(engine)
+    if "campaigns" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("campaigns")}
+    additions = {
+        "model_mode": "VARCHAR(50) DEFAULT 'offline'",
+        "model_name": "VARCHAR(255)",
+        "user_goal": "TEXT",
+        "extra_context": "TEXT",
+    }
+    with engine.begin() as conn:
+        for column, ddl in additions.items():
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE campaigns ADD COLUMN {column} {ddl}"))
+
+def _migrate_research_columns():
+    """Add newly introduced JSON columns for existing SQLite databases."""
+    inspector = inspect(engine)
+    if "research" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("research")}
+    additions = {
+        "locations": "JSON DEFAULT '[]'",
+        "social_profiles": "JSON DEFAULT '[]'",
+        "reviews_summary": "JSON DEFAULT '{}'",
+        "osint_sources": "JSON DEFAULT '[]'",
+        "search_tool_coverage": "JSON DEFAULT '{}'",
+        "competitor_evidence": "JSON DEFAULT '[]'",
+        "research_depth": "VARCHAR(50) DEFAULT 'standard'",
+    }
+    with engine.begin() as conn:
+        for column, ddl in additions.items():
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE research ADD COLUMN {column} {ddl}"))
 
 def get_db():
     db = SessionLocal()

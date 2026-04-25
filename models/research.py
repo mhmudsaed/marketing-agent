@@ -26,6 +26,46 @@ class ResearchEvidence(BaseModel):
     quotes: List[str] = Field(default_factory=list, description="Direct quotes from sources")
     search_queries_used: List[str] = Field(default_factory=list)
 
+class BusinessLocation(BaseModel):
+    name: str = Field(default="", description="Location or listing name")
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    category: Optional[str] = None
+    rating: Optional[float] = None
+    reviews: Optional[int] = None
+    place_id: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class SocialProfile(BaseModel):
+    platform: str = Field(description="Platform name, e.g. Instagram or LinkedIn")
+    url: str = Field(description="Public profile URL")
+    title: Optional[str] = None
+    snippet: Optional[str] = None
+    confidence: float = Field(0.5, ge=0.0, le=1.0)
+
+class ReviewsSummary(BaseModel):
+    average_rating: Optional[float] = None
+    total_reviews: Optional[int] = None
+    themes: List[str] = Field(default_factory=list)
+    source_urls: List[str] = Field(default_factory=list)
+
+class OSINTSource(BaseModel):
+    tool: str = Field(description="Tool used, e.g. serpapi, tavily, firecrawl, http")
+    source_type: str = Field(description="Source category, e.g. website, google_maps, social")
+    title: str = ""
+    url: str = ""
+    snippet: str = ""
+    score: float = Field(0.0, ge=0.0, le=1.0)
+
+class SearchToolCoverage(BaseModel):
+    serpapi: int = 0
+    tavily: int = 0
+    firecrawl: int = 0
+    website_pages: int = 0
+    total_sources: int = 0
+
 class BusinessProfile(BaseModel):
     name: str = Field(description="Company name")
     tagline: Optional[str] = Field(None, description="Company tagline or one-liner")
@@ -45,6 +85,13 @@ class ResearchResult(BaseModel):
     competitors: List[Competitor] = Field(default_factory=list)
     content_examples: List[str] = Field(default_factory=list, description="Existing content samples for few-shot")
     evidence: ResearchEvidence
+    locations: List[BusinessLocation] = Field(default_factory=list)
+    social_profiles: List[SocialProfile] = Field(default_factory=list)
+    reviews_summary: ReviewsSummary = Field(default_factory=ReviewsSummary)
+    osint_sources: List[OSINTSource] = Field(default_factory=list)
+    search_tool_coverage: SearchToolCoverage = Field(default_factory=SearchToolCoverage)
+    competitor_evidence: List[OSINTSource] = Field(default_factory=list)
+    research_depth: str = Field("standard", description="Research breadth/depth descriptor")
     raw_data: Optional[dict] = Field(None, description="Raw scraped/search data for debugging")
     confidence_score: float = Field(0.0, ge=0.0, le=1.0, description="Confidence in research quality")
     summary: str = Field(description="Executive summary of findings")
